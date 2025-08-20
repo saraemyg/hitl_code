@@ -1,0 +1,32 @@
+{
+  "name": "hitl-vercel-app",
+  "version": "1.0.0",
+  "description": "Human-in-the-Loop Validation System using YOLO for defect detection.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "@tensorflow/tfjs": "latest",
+    "@tensorflow/tfjs-node": "latest",
+    "opencv4nodejs": "latest"
+  },
+  "devDependencies": {
+    "eslint": "latest",
+    "eslint-config-next": "latest"
+  },
+  "keywords": [
+    "YOLO",
+    "object-detection",
+    "human-in-the-loop",
+    "validation",
+    "react"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
