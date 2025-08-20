@@ -1,20 +1,19 @@
 import React from 'react';
 
-const ValidationControls = ({ onCorrect, onHealthy, onOtherDefect, classes }) => {
-    return (
-        <div>
-            <button onClick={onCorrect}>Correct Defect</button>
-            <button onClick={onHealthy}>Healthy</button>
-            <label>
-                Other Defect:
-                <select onChange={(e) => onOtherDefect(e.target.value)}>
-                    {classes.map((cls, index) => (
-                        <option key={index} value={cls}>{cls}</option>
-                    ))}
-                </select>
-            </label>
-        </div>
-    );
-};
+const ValidationControls = ({
+    onValidate,
+    onOtherDefect,
+    classes = [] // <-- Default to empty array
+}) => (
+    <div>
+        Other Defect:
+        <select onChange={(e) => onOtherDefect(e.target.value)}>
+            {classes.map((cls, index) => (
+                <option key={index} value={cls}>{cls}</option>
+            ))}
+        </select>
+        <button onClick={onValidate}>Validate</button>
+    </div>
+);
 
 export default ValidationControls;

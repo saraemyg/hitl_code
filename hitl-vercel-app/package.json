@@ -9,12 +9,10 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
     "@tensorflow/tfjs": "latest",
-    "@tensorflow/tfjs-node": "latest",
-    "opencv4nodejs": "latest"
+    "next": "^15.5.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "eslint": "latest",

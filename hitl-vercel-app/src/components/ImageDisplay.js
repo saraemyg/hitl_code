@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ImageDisplay = ({ imageSrc, boundingBoxes, labels }) => {
+const ImageDisplay = ({ imageSrc, boundingBoxes = [], labels = [] }) => {
     return (
         <div style={{ position: 'relative', display: 'inline-block' }}>
             <img src={imageSrc} alt="Detected" style={{ width: '500px', height: '500px' }} />
