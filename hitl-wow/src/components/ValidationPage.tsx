@@ -4,40 +4,41 @@ import { ValidationControls } from './ValidationControls';
 import { ProgressBar } from './ProgressBar';
 import { useDetectionData } from '../hooks/useDetectionData';
 import { FileImage, Target } from 'lucide-react';
+import { Detection } from '../types';
 
 export const ValidationPage: React.FC = () => {
   const {
     getCurrentImage,
     getCurrentDetection,
+    getCurrentCropPath,
     validateDetection,
     getTotalDetections,
     getValidatedCount,
     getProgress,
     currentImageIndex,
-    currentDetectionIndex,
     imageData
   } = useDetectionData();
 
-  const currentImage = getCurrentImage();
-  const currentDetection = getCurrentDetection();
+  // Placeholder image if dataset is empty or unreachable
+  const placeholderImage = {
+    name: "placeholder.jpg",
+    path: "https://i.pinimg.com/736x/d4/71/c4/d471c4befa7ec4053d9eaf8e1034b870.jpg"
+  };
 
-  if (!currentImage || !currentDetection) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
-        <div className="text-center bg-white rounded-lg shadow-xl p-12 max-w-md">
-          <Target className="mx-auto mb-4 text-green-500" size={64} />
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Validation Complete!
-          </h2>
-          <p className="text-gray-600">
-            All detections have been validated successfully.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Placeholder detection so nothing is ever null
+  const placeholderDetection: Detection = {
+    id: "0", bbox: [0, 0, 0, 0], confidence: 0, classId: 0, className: "placeholder",
+    imagePath: "0.jpg", validated: false, validatedAs: "none", cropPath: "0.jpg"
+  };
 
-  const progressText = `Image ${currentImageIndex + 1}/${imageData.length} - ${currentImage.name}`;
+  const isUsingPlaceholder = imageData.length === 0;
+  const currentImage = getCurrentImage() || placeholderImage;
+  const cropImage = getCurrentCropPath() || placeholderImage.path;
+  const currentDetection = isUsingPlaceholder ? placeholderDetection : getCurrentDetection();
+
+  const progressText = isUsingPlaceholder
+    ? "Preview Mode (No dataset found)"
+    : `Image ${currentImageIndex + 1}/${imageData.length} - ${currentImage.name}`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -72,7 +73,6 @@ export const ValidationPage: React.FC = () => {
             <ImageViewer
               imageSrc={currentImage.path} // Use the full image path
               detection={currentDetection} // Pass detection for bounding box
-              className="aspect-square"
             />
           </div>
 
@@ -82,9 +82,8 @@ export const ValidationPage: React.FC = () => {
               Detected Region (Cropped)
             </h3>
             <ImageViewer
-              imageSrc={currentImage.path} // Use the full image path
+              imageSrc={cropImage} // Use the full image path
               detection={currentDetection} // Pass detection for cropping
-              showBoundingBox={false}
               className="aspect-square"
             />
           </div>

@@ -7,6 +7,7 @@ export interface Detection {
   imagePath: string;
   validated?: boolean;
   validatedAs?: string;
+  cropPath: string;
 }
 
 export interface ValidationResult {

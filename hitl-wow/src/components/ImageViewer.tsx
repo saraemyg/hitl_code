@@ -3,15 +3,12 @@ import { Detection } from '../types';
 
 interface ImageViewerProps {
   imageSrc: string;
-  detection: Detection;
-  showBoundingBox?: boolean;
+  detection?: Detection;  // now optional since we’re not using it
   className?: string;
 }
 
 export const ImageViewer: React.FC<ImageViewerProps> = ({
   imageSrc,
-  detection,
-  showBoundingBox = true,
   className = ""
 }) => {
   const [imgSize, setImgSize] = useState({ width: 640, height: 640 });
@@ -31,11 +28,8 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
     }
   };
 
-  const [x1, y1, x2, y2] = detection.bbox;
-  const { width, height } = imgSize;
-
   return (
-    <div className={`relative bg-gray-100 rounded-lg overflow-hidden ${className}`}>
+    <div className={`relative bg-gray-100 rounded-lg overflow-hidden flex ${className}`}>
       <img
         ref={imgRef}
         src={imageSrc}
@@ -43,34 +37,6 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
         className="w-full h-full object-cover"
         onLoad={handleImageLoad}
       />
-
-      {showBoundingBox && (
-        <>
-          {/* Bounding box overlay */}
-          <div
-            className="absolute border-4 border-green-400 bg-green-400 bg-opacity-10"
-            style={{
-              left: `${(x1 / width) * 100}%`,
-              top: `${(y1 / height) * 100}%`,
-              width: `${((x2 - x1) / width) * 100}%`,
-              height: `${((y2 - y1) / height) * 100}%`,
-              pointerEvents: 'none'
-            }}
-          />
-
-          {/* Label */}
-          <div
-            className="absolute bg-green-400 text-black px-2 py-1 text-sm font-semibold rounded"
-            style={{
-              left: `${(x1 / width) * 100}%`,
-              top: `${Math.max(0, (y1 - 30) / height) * 100}%`,
-              pointerEvents: 'none'
-            }}
-          >
-            {detection.className} ({detection.confidence.toFixed(2)})
-          </div>
-        </>
-      )}
     </div>
   );
 };

@@ -3,21 +3,23 @@ import { Detection, ImageData } from '../types';
 
 const fetchDetectionMetadata = async (): Promise<ImageData[]> => {
   // Fetch metadata from backend
-  const response = await fetch('http://localhost:8000/outputs/bulk_detection_metadata.json');
+  const response = await fetch('http://localhost:8000/processed_img/detection_metadata.json');
   const metadata = await response.json();
 
   // Transform backend metadata to ImageData[]
   return metadata.map((item: any) => ({
-    path: `http://localhost:8000/outputs/${item.output_image}`,
-    name: item.input_image,
+    path: `http://localhost:8000/processed_img/${item.processed_img}`,  // processed image path
+    name: item.uploaded_img,                                           // original uploaded name
     detections: item.detections.map((det: any, idx: number) => ({
-      id: `${item.input_image}-${idx}`,
+      id: `${item.uploaded_img}-${det.defect_id ?? idx}`,              // prefer defect_id if exists
       bbox: det.bbox,
       confidence: det.confidence,
       className: det.defect_type,
-      validated: false,
+      validated: det.status !== "unvalidated",                         // map from backend status
+      cropPath: `http://localhost:8000/${det.crop_path.replace(/\\/g, "/")}`, // normalize Windows path
     })),
     processed: true,
+    defectCount: item.defect_count,                                    // optional: track defect count
   }));
 };
 
@@ -33,9 +35,15 @@ export const useDetectionData = () => {
   }, []);
 
   const getCurrentImage = () => imageData[currentImageIndex];
+  
   const getCurrentDetection = () => {
     const currentImage = getCurrentImage();
     return currentImage?.detections[currentDetectionIndex];
+  };
+
+  const getCurrentCropPath = () => {
+    const currentDetection = getCurrentDetection();
+    return currentDetection?.cropPath ?? null;
   };
 
   const validateDetection = (decision: 'correct' | 'healthy' | 'other', className?: string) => {
@@ -95,6 +103,7 @@ export const useDetectionData = () => {
     currentDetectionIndex,
     getCurrentImage,
     getCurrentDetection,
+    getCurrentCropPath, 
     validateDetection,
     getTotalDetections,
     getValidatedCount,
