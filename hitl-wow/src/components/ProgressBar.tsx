@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { Download } from 'lucide-react';
 
 interface ProgressBarProps {
   progress: number;
@@ -9,8 +10,9 @@ interface ProgressBarProps {
 export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, total }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
 
-  // This function will be called when a file is selected
+  // Upload handler
   const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -56,16 +58,66 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     }
   };
 
+  // Convert to YOLOv11 handler
+  const handleConvertYOLOv11 = async () => {
+    try {
+      setIsConverting(true);
+      const response = await fetch('http://localhost:8000/convert-yolov11', {
+        method: 'POST',
+      });
+
+      const result = await response.json();
+      console.log(result);
+
+      alert(`✅ Conversion complete: ${result.output_path}`);
+    } catch (error) {
+      console.error("Conversion failed", error);
+      alert("Conversion failed!");
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
+  // Download YOLOv11 annotations
+  const handleDownloadAnnotations = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/download-annotations', {
+        method: 'GET',
+      });
+
+      if (!response.ok) throw new Error("Failed to download annotations");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'annotations.zip';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download failed", error);
+      alert("Download failed!");
+    }
+  };
+
   // Spinner view -> please fix this haha buruk namam
-  if (isDetecting) {
+  if (isDetecting || isConverting) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
         <div className="text-center bg-white rounded-lg shadow-xl p-12 max-w-md">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Running bulk detection...
+            {isDetecting ? "Running bulk detection..." : "Converting to YOLOv11 format..."}
           </h2>
-          <p className="text-gray-600">Please wait while AI processes your images.</p>
+          <p className="text-gray-600">
+            {isDetecting
+              ? "Please wait while AI processes your images."
+              : "Please wait while dataset is being converted."}
+          </p>    
         </div>
       </div>
     );
@@ -103,6 +155,20 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           onClick={handleBulkDetect}
         >
           Run Detection
+        </button>
+
+        <button
+          className="ml-4 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+          onClick={handleConvertYOLOv11}
+        >
+          Convert to YOLOv11 Format
+        </button>
+
+        <button
+          className="ml-4 p-2 bg-gray-200 rounded hover:bg-gray-300"
+          onClick={handleDownloadAnnotations}
+        >
+          <Download size={18} className="text-gray-700" />
         </button>
 
       </div>

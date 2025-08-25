@@ -3,7 +3,7 @@ import { Detection } from '../types';
 
 interface ImageViewerProps {
   imageSrc: string;
-  detection?: Detection;  // now optional since we’re not using it
+  detection?: Detection; 
   className?: string;
 }
 
@@ -29,12 +29,15 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
   };
 
   return (
-    <div className={`relative bg-gray-100 rounded-lg overflow-hidden flex ${className}`}>
+    <div
+      className={`relative bg-gray-100 rounded-lg overflow-hidden flex justify-center items-center ${className}`}
+      style={{ height: "400px" }} // constant height
+    >
       <img
         ref={imgRef}
         src={imageSrc}
         alt="Plant detection"
-        className="w-full h-full object-cover"
+        className="h-full w-auto object-contain"  // ✅ keep aspect ratio
         onLoad={handleImageLoad}
       />
     </div>

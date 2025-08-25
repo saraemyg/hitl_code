@@ -6,12 +6,11 @@ import { useDetectionData } from '../hooks/useDetectionData';
 import { FileImage } from 'lucide-react';
 import { Detection } from '../types';
 
-// Placeholder fallbacks
+// Placeholder handling
 const PLACEHOLDER_IMAGE = {
   name: "placeholder.jpg",
   path: "https://i.pinimg.com/736x/d4/71/c4/d471c4befa7ec4053d9eaf8e1034b870.jpg"
 };
-
 const PLACEHOLDER_DETECTION: Detection = {
   defect_id: 0,
   defect_type: "placeholder",
@@ -56,7 +55,7 @@ export const ValidationPage: React.FC = () => {
   const progressText = isUsingPlaceholder
     ? "Preview Mode (No dataset found)"
     : `Image ${currentImageIndex + 1}/${imageData.length} - ${currentImage?.uploaded_img}`;
-
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
       <div className="container mx-auto px-4 py-8">
@@ -65,7 +64,7 @@ export const ValidationPage: React.FC = () => {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <FileImage className="text-blue-600" size={32} />
-            <h1 className="text-3xl font-bold text-gray-800">Validation Tool</h1>
+            <h1 className="text-3xl font-bold text-gray-800">Hahahahahha</h1>
           </div>
           <p className="text-gray-600 text-lg">{progressText}</p>
         </div>
@@ -80,10 +79,10 @@ export const ValidationPage: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="max-w-6xl mx-auto grid grid-cols-2 grid-rows-2 gap-8">
+        <div className="max-w-8xl mx-auto grid grid-cols-4 grid-rows-2 gap-3">
           
           {/* Full Image */}
-          <div className="row-start-1 col-start-2 bg-white rounded-lg shadow-lg p-6">
+          <div className="row-start-1 col-start-1 col-end-3 bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Full Image with Detection
             </h3>
@@ -94,19 +93,19 @@ export const ValidationPage: React.FC = () => {
           </div>
 
           {/* Cropped Region */}
-          <div className="row-start-1 col-start-1 bg-white rounded-lg shadow-lg p-6">
+          <div className="row-start-1 col-start-3 col-end-5 bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Detected Region (Cropped)
             </h3>
             <ImageViewer
               imageSrc={cropSrc}
               detection={currentDetection}
-              className="aspect-square"
+              // className="aspect-square"
             />
           </div>
 
           {/* Validation Controls */}
-          <div className="row-start-2 col-start-2 bg-white rounded-lg shadow-lg p-6 flex flex-col justify-top">
+          <div className="row-start-2 col-start-3 col-end-5 bg-white rounded-lg shadow-lg p-6 flex flex-col justify-top">
             <ValidationControls
               onValidate={validateDetection}
               detectedClass={currentDetection.defect_type}
@@ -115,7 +114,7 @@ export const ValidationPage: React.FC = () => {
           </div>
 
           {/* Detection Info */}
-          <div className="row-start-2 col-start-1 bg-white rounded-lg shadow-lg p-6">
+          <div className="row-start-2 col-start-1 col-end-3 bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Detection Details
             </h3>
@@ -127,7 +126,7 @@ export const ValidationPage: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-gray-600">Confidence:</span>
                 <span className="font-semibold">
-                  {Number(currentDetection.confidence).toFixed(3)}
+                  {(currentDetection.confidence / 1e10).toFixed(4)}
                 </span>
               </div>
               <div className="flex justify-between">

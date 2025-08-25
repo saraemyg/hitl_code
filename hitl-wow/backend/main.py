@@ -1,11 +1,12 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Path
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+import shutil
+import tempfile
+import time
 import logging
 import uvicorn
-from model_handler import PlantDefectDetector
-import time
 from contextlib import asynccontextmanager
 from PIL import Image
 import io
@@ -14,6 +15,9 @@ import os
 from datetime import datetime
 from typing import List
 import json
+
+from model_handler import PlantDefectDetector
+from yolo_converter import convert_to_yolov11
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -206,8 +210,40 @@ async def upload_images(files: List[UploadFile] = File(...)):
         "saved_files": saved_files
     }
 
-# convert metadata.json to yolov11 format ready to train ; converter.yolov11format 
-# click button export, can click button download
+@app.post("/convert-yolov11")
+async def convert_yolov11():
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = os.path.join("yolov11",f"yolov11_format{timestamp}")
+    result = convert_to_yolov11(metadata_path, output_dir)
+    return {
+        "status": "success",
+        "output_dir": output_dir,
+        "timestamp": timestamp
+    }
+
+@app.get("/download-annotations")
+async def download_annotations():
+    try:
+        # Step 1: Convert to YOLOv11 format
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir = os.path.join("yolov11", f"yolov11_format_{timestamp}")
+        os.makedirs(output_dir, exist_ok=True)
+        convert_to_yolov11(metadata_path, output_dir)
+
+        # Step 2: Zip the folder
+        zip_filename = f"annotations_{timestamp}.zip"
+        zip_path = os.path.join(tempfile.gettempdir(), zip_filename)
+        shutil.make_archive(zip_path.replace(".zip", ""), "zip", output_dir)
+
+        # Step 3: Return file for download
+        return FileResponse(
+            path=zip_path,
+            filename=zip_filename,
+            media_type="application/zip"
+        )
+    except Exception as e:
+        logger.error(f"Download annotations failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 #----validation process------------------------------------------
 

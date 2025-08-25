@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Check, X, AlertTriangle } from 'lucide-react';
+import { Check, X, AlertTriangle, SkipForward, SkipBack } from 'lucide-react';
 import { DEFECT_CLASSES } from '../types';
 
 interface ValidationControlsProps {
-  onValidate: (decision: "correct" | "healthy" | "other", className?: string) => void;
+  onValidate: (decision: "correct" | "healthy" | "other" | "next" | "back", className?: string) => void;
   detectedClass: string;   // YOLO class (for display)
   confidence: number;      // unique identifier from backend
 }
@@ -26,7 +26,6 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
         body.defect_type = className;
       }
 
-      // encode detectedClass (confidence) so floats/strings pass safely in URL
       const res = await fetch(`http://localhost:8000/detections/${confidence}/validate`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -37,7 +36,6 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
       const updated = await res.json();
       console.log("Detection updated:", updated);
 
-      // notify parent after backend success
       onValidate(decision, className);
     } catch (err) {
       console.error("Error updating detection:", err);
@@ -54,22 +52,51 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
       const result = await res.json();
       console.log("Detection deleted:", result);
 
-      // notify parent that detection is removed
       onValidate("healthy");
     } catch (err) {
       console.error("Error deleting detection:", err);
     }
   };
+
+  // Navigation handlers (no backend calls)
+  const nextDetection = () => {
+    console.log("Next detection:", confidence);
+    onValidate("next");
+  };
+
+  const prevDetection = () => {
+    console.log("Back to previous detection");
+    onValidate("back");
+  };
   
-  return (
+return (
     <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-      <div className="text-center">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+      {/* Header with navigation */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-800">
           Detected: {detectedClass}
         </h3>
-        <p className="text-gray-600">Please validate this detection:</p>
+        <div className="flex gap-2">
+          <button
+            onClick={prevDetection}
+            className="flex items-center gap-1 bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-md hover:shadow-lg"
+          >
+            <SkipBack size={16} />
+            Back
+          </button>
+          <button
+            onClick={nextDetection}
+            className="flex items-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-md hover:shadow-lg"
+          >
+            Next
+            <SkipForward size={16} />
+          </button>
+        </div>
       </div>
 
+      <p className="text-gray-600 text-center">Please validate this detection:</p>
+
+      {/* Validation buttons */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button
           onClick={() => validateDetection("correct", detectedClass)}
@@ -88,8 +115,9 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
         </button>
       </div>
 
-      <div className="border-t pt-6">
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+      {/* Other / delete */}
+      <div className="border-t pt-6 space-y-4">
+        <label className="block text-sm font-medium text-gray-700">
           Or select different defect type:
         </label>
         <div className="flex gap-3">
@@ -111,16 +139,15 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
             <AlertTriangle size={20} />
             Confirm Other
           </button>
-
-          <button
-            onClick={deleteDetection}
-            className="mt-4 w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
-          >
-            <X size={20} />
-            Delete Detection
-          </button>
-
         </div>
+
+        <button
+          onClick={deleteDetection}
+          className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
+        >
+          <X size={20} />
+          Delete Detection
+        </button>
       </div>
     </div>
   );
