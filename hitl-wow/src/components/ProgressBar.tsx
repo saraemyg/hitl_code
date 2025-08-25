@@ -56,7 +56,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     }
   };
 
-  // Spinner view
+  // Spinner view -> please fix this haha buruk namam
   if (isDetecting) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">

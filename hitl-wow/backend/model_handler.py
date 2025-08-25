@@ -76,7 +76,7 @@ class PlantDefectDetector:
 
         return save_path
 
-    def predict(self, image: np.ndarray, return_image: bool, conf_threshold: float = 0.5):
+    def predict(self, image: np.ndarray, return_image: bool, conf_threshold: float = 0.8):
         if not self.is_loaded:
             raise Exception("Model not loaded")
 
@@ -95,6 +95,8 @@ class PlantDefectDetector:
                     defect_id = int(box.cls[0])
                     defect_type = result.names[defect_id]
                     x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+                    conf = float(box.conf[0])
+                    conf_str = int(conf * (10**10))
 
                     # Call crop_handler
                     crop_path = self.crop_handler(
@@ -105,7 +107,7 @@ class PlantDefectDetector:
                     detection = {
                         "defect_id": defect_id,
                         "defect_type": defect_type,
-                        "confidence": float(box.conf[0]),
+                        "confidence": conf_str,
                         "bbox": box.xyxy[0].cpu().numpy().tolist(),
                         "status": "unvalidated",
                         "crop_path": crop_path

@@ -2,24 +2,33 @@ import { useState, useEffect } from 'react';
 import { Detection, ImageData } from '../types';
 
 const fetchDetectionMetadata = async (): Promise<ImageData[]> => {
-  // Fetch metadata from backend
-  const response = await fetch('http://localhost:8000/processed_img/detection_metadata.json');
+  const response = await fetch(
+    `http://localhost:8000/metadata?t=${Date.now()}` // cache-bust
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch metadata");
+  }
+
   const metadata = await response.json();
 
-  // Transform backend metadata to ImageData[]
   return metadata.map((item: any) => ({
-    path: `http://localhost:8000/processed_img/${item.processed_img}`,  // processed image path
-    name: item.uploaded_img,                                           // original uploaded name
-    detections: item.detections.map((det: any, idx: number) => ({
-      id: `${item.uploaded_img}-${det.defect_id ?? idx}`,              // prefer defect_id if exists
+    uploaded_img: item.uploaded_img,
+    processed_img: `http://localhost:8000/processed_img/${item.processed_img}`,
+    defect_count: item.defect_count,
+
+    detections: item.detections.map((det: any) => ({
+      defect_id: det.defect_id,
+      defect_type: det.defect_type,
+      confidence: det.confidence, // backend sends as string
       bbox: det.bbox,
-      confidence: det.confidence,
-      className: det.defect_type,
-      validated: det.status !== "unvalidated",                         // map from backend status
-      cropPath: `http://localhost:8000/${det.crop_path.replace(/\\/g, "/")}`, // normalize Windows path
+      status: det.status,
+      crop_path: `http://localhost:8000/${det.crop_path.replace(/\\/g, "/")}`,
+
+      // frontend-only state (not in backend)
+      validated: det.status !== "unvalidated",
+      validatedAs: undefined,
     })),
-    processed: true,
-    defectCount: item.defect_count,                                    // optional: track defect count
   }));
 };
 
@@ -29,22 +38,23 @@ export const useDetectionData = () => {
   const [currentDetectionIndex, setCurrentDetectionIndex] = useState(0);
   const [validationResults, setValidationResults] = useState<any[]>([]);
 
+  const reloadMetadata = async () => {
+    setImageData([]);
+    setCurrentImageIndex(0);
+    setCurrentDetectionIndex(0);
+    setValidationResults([]);
+
+    const freshMetadata = await fetchDetectionMetadata();
+    setImageData(freshMetadata);
+  };
+
   useEffect(() => {
-    // Fetch detection metadata from backend
-    fetchDetectionMetadata().then(setImageData);
+    reloadMetadata();
   }, []);
 
   const getCurrentImage = () => imageData[currentImageIndex];
-  
-  const getCurrentDetection = () => {
-    const currentImage = getCurrentImage();
-    return currentImage?.detections[currentDetectionIndex];
-  };
-
-  const getCurrentCropPath = () => {
-    const currentDetection = getCurrentDetection();
-    return currentDetection?.cropPath ?? null;
-  };
+  const getCurrentDetection = () => getCurrentImage()?.detections[currentDetectionIndex];
+  const getCurrentCropPath = () => getCurrentDetection()?.crop_path ?? null;
 
   const validateDetection = (decision: 'correct' | 'healthy' | 'other', className?: string) => {
     const currentDetection = getCurrentDetection();
@@ -55,15 +65,15 @@ export const useDetectionData = () => {
       updated[currentImageIndex].detections[currentDetectionIndex] = {
         ...currentDetection,
         validated: true,
-        validatedAs: decision === 'other' ? className : decision
+        validatedAs: decision === 'other' ? className : decision,
       };
       return updated;
     });
 
     setValidationResults(prev => [...prev, {
-      detectionId: currentDetection.id,
+      detectionId: currentDetection.confidence,
       decision,
-      className: decision === 'other' ? className : undefined
+      className: decision === 'other' ? className : undefined,
     }]);
 
     moveToNext();
@@ -81,15 +91,12 @@ export const useDetectionData = () => {
     }
   };
 
-  const getTotalDetections = () => {
-    return imageData.reduce((total, image) => total + image.detections.length, 0);
-  };
+  // --- Progress helpers ---
+  const getTotalDetections = () =>
+    imageData.reduce((total, img) => total + img.detections.length, 0);
 
-  const getValidatedCount = () => {
-    return imageData.reduce((total, image) => 
-      total + image.detections.filter(d => d.validated).length, 0
-    );
-  };
+  const getValidatedCount = () =>
+    imageData.reduce((total, img) => total + img.detections.filter(d => d.validated).length, 0);
 
   const getProgress = () => {
     const total = getTotalDetections();
@@ -103,11 +110,12 @@ export const useDetectionData = () => {
     currentDetectionIndex,
     getCurrentImage,
     getCurrentDetection,
-    getCurrentCropPath, 
+    getCurrentCropPath,
     validateDetection,
     getTotalDetections,
     getValidatedCount,
     getProgress,
-    validationResults
+    validationResults,
+    reloadMetadata, // expose reload so frontend can trigger refresh
   };
 };

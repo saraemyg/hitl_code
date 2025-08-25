@@ -3,16 +3,64 @@ import { Check, X, AlertTriangle } from 'lucide-react';
 import { DEFECT_CLASSES } from '../types';
 
 interface ValidationControlsProps {
-  onValidate: (decision: 'correct' | 'healthy' | 'other', className?: string) => void;
-  detectedClass: string;
+  onValidate: (decision: "correct" | "healthy" | "other", className?: string) => void;
+  detectedClass: string;   // YOLO class (for display)
+  confidence: number;      // unique identifier from backend
 }
 
 export const ValidationControls: React.FC<ValidationControlsProps> = ({ 
   onValidate, 
-  detectedClass 
+  detectedClass,
+  confidence
 }) => {
   const [selectedClass, setSelectedClass] = useState(DEFECT_CLASSES[0]);
+  
+  const validateDetection = async (
+    decision: "correct" | "healthy" | "other",
+    className?: string
+  ) => {
+    try {
+      let body: any = { decision };
 
+      if (decision === "other" && className) {
+        body.defect_type = className;
+      }
+
+      // encode detectedClass (confidence) so floats/strings pass safely in URL
+      const res = await fetch(`http://localhost:8000/detections/${confidence}/validate`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) throw new Error("Failed to update detection");
+      const updated = await res.json();
+      console.log("Detection updated:", updated);
+
+      // notify parent after backend success
+      onValidate(decision, className);
+    } catch (err) {
+      console.error("Error updating detection:", err);
+    }
+  };
+
+  const deleteDetection = async () => {
+    try {
+      const res = await fetch(`http://localhost:8000/detections/${confidence}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Failed to delete detection");
+      const result = await res.json();
+      console.log("Detection deleted:", result);
+
+      // notify parent that detection is removed
+      onValidate("healthy");
+    } catch (err) {
+      console.error("Error deleting detection:", err);
+    }
+  };
+  
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
       <div className="text-center">
@@ -24,7 +72,7 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button
-          onClick={() => onValidate('correct')}
+          onClick={() => validateDetection("correct", detectedClass)}
           className="flex items-center justify-center gap-3 bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
         >
           <Check size={24} />
@@ -32,7 +80,7 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
         </button>
 
         <button
-          onClick={() => onValidate('healthy')}
+          onClick={() => validateDetection("healthy", detectedClass)}
           className="flex items-center justify-center gap-3 bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
         >
           <X size={24} />
@@ -57,12 +105,21 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
             ))}
           </select>
           <button
-            onClick={() => onValidate('other', selectedClass)}
+            onClick={() => validateDetection("other", selectedClass)}
             className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
           >
             <AlertTriangle size={20} />
             Confirm Other
           </button>
+
+          <button
+            onClick={deleteDetection}
+            className="mt-4 w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
+          >
+            <X size={20} />
+            Delete Detection
+          </button>
+
         </div>
       </div>
     </div>
