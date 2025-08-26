@@ -1,0 +1,160 @@
+[
+  {
+    "uploaded_img": "MY-SL02_2024-11-12_6732a58d6128cde0f6472f97.jpeg",
+    "processed_img": "20250825_173626_MY-SL02_2024-11-12_6732a58d6128cde0f6472f97.jpeg_processed.jpg",
+    "detections": [
+      {
+        "defect_id": 6,
+        "defect_type": "Yellowing",
+        "confidence": 8268382549,
+        "bbox": [
+          2676.4755859375,
+          2167.767333984375,
+          2788.296630859375,
+          2237.140380859375
+        ],
+        "status": "validated",
+        "crop_path": "processed_img\\crops\\Yellowing_6_2576206728882337.jpg"
+      },
+      {
+        "defect_id": 1,
+        "defect_type": "Browning",
+        "confidence": 8261402249,
+        "bbox": [
+          3757.572265625,
+          2541.35888671875,
+          3889.228515625,
+          2661.6904296875
+        ],
+        "status": "validated",
+        "crop_path": "processed_img\\crops\\Browning_1_3657244139892761.jpg"
+      }
+    ],
+    "defect_count": 2
+  },
+  {
+    "uploaded_img": "MY-SL02_2024-11-12_6732a6486128cde0f6473033.jpeg",
+    "processed_img": "20250825_173628_MY-SL02_2024-11-12_6732a6486128cde0f6473033.jpeg_processed.jpg",
+    "detections": [
+      {
+        "defect_id": 4,
+        "defect_type": "Purpling",
+        "confidence": 8530139923,
+        "bbox": [
+          2077.1904296875,
+          2266.25927734375,
+          2295.162109375,
+          2532.168212890625
+        ],
+        "status": "validated",
+        "crop_path": "processed_img\\crops\\Purpling_4_1977216623952632.jpg"
+      }
+    ],
+    "defect_count": 1
+  },
+  {
+    "uploaded_img": "MY-SL02_2024-11-12_6732a65c6128cde0f6473071.jpeg",
+    "processed_img": "20250825_173630_MY-SL02_2024-11-12_6732a65c6128cde0f6473071.jpeg_processed.jpg",
+    "detections": [
+      {
+        "defect_id": 6,
+        "defect_type": "Purpling",
+        "confidence": 8467003703,
+        "bbox": [
+          2272.573486328125,
+          2387.758544921875,
+          2454.24609375,
+          2587.139892578125
+        ],
+        "status": "validated",
+        "crop_path": "processed_img\\crops\\Yellowing_6_2172228725542687.jpg"
+      }
+    ],
+    "defect_count": 1
+  },
+  {
+    "uploaded_img": "MY-SL02_2024-11-12_6732a6816128cde0f6473090.jpeg",
+    "processed_img": "20250825_173631_MY-SL02_2024-11-12_6732a6816128cde0f6473090.jpeg_processed.jpg",
+    "detections": [],
+    "defect_count": 1
+  },
+  {
+    "uploaded_img": "MY-SL02_2024-11-12_6732a69d6128cde0f64730a1.jpeg",
+    "processed_img": "20250825_173633_MY-SL02_2024-11-12_6732a69d6128cde0f64730a1.jpeg_processed.jpg",
+    "detections": [
+      {
+        "defect_id": 1,
+        "defect_type": "Browning",
+        "confidence": 8070552349,
+        "bbox": [
+          2483.13232421875,
+          2490.62841796875,
+          2617.3427734375,
+          2626.87890625
+        ],
+        "status": "unvalidated",
+        "crop_path": "processed_img\\crops\\Browning_1_2383239027172726.jpg"
+      }
+    ],
+    "defect_count": 1
+  },
+  {
+    "uploaded_img": "MY-SL02_2024-11-12_6732b2776128cde0f64733dd.jpeg",
+    "processed_img": "20250825_173634_MY-SL02_2024-11-12_6732b2776128cde0f64733dd.jpeg_processed.jpg",
+    "detections": [
+      {
+        "defect_id": 4,
+        "defect_type": "Purpling",
+        "confidence": 8248546123,
+        "bbox": [
+          893.7830810546875,
+          2018.007568359375,
+          1168.525146484375,
+          2190.149658203125
+        ],
+        "status": "unvalidated",
+        "crop_path": "processed_img\\crops\\Purpling_4_793191812682290.jpg"
+      }
+    ],
+    "defect_count": 1
+  },
+  {
+    "uploaded_img": "MY-SL02_2024-11-12_6732b2c26128cde0f6473464.jpeg",
+    "processed_img": "20250825_173636_MY-SL02_2024-11-12_6732b2c26128cde0f6473464.jpeg_processed.jpg",
+    "detections": [
+      {
+        "defect_id": 4,
+        "defect_type": "Purpling",
+        "confidence": 8536316752,
+        "bbox": [
+          2417.6748046875,
+          1223.0015869140625,
+          2573.664794921875,
+          1435.5028076171875
+        ],
+        "status": "unvalidated",
+        "crop_path": "processed_img\\crops\\Purpling_4_2317112326731535.jpg"
+      },
+      {
+        "defect_id": 4,
+        "defect_type": "Purpling",
+        "confidence": 8508999943,
+        "bbox": [
+          3721.2158203125,
+          1475.9781494140625,
+          3911.721435546875,
+          1620.5528564453125
+        ],
+        "status": "unvalidated",
+        "crop_path": "processed_img\\crops\\Purpling_4_3621137540111720.jpg"
+      }
+    ],
+    "defect_count": 2
+  },
+  {
+    "uploaded_img": "MY-SL02_2024-11-12_6732b31c6128cde0f64734a9.jpeg",
+    "processed_img": "20250825_173637_MY-SL02_2024-11-12_6732b31c6128cde0f64734a9.jpeg_processed.jpg",
+    "detections": [],
+    "defect_count": 0
+  }
+]
