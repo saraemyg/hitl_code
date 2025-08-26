@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 7
+names: ['BrownSpot', 'Browning', 'BurnedTip', 'Curling', 'Purpling', 'Wilting', 'Yellowing']
+
+roboflow:
+  workspace: planthealthml
+  project: plantdefecttest
+  version: 3
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/planthealthml/plantdefecttest/dataset/3
