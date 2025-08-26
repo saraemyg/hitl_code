@@ -3,7 +3,7 @@ import { ImageViewer } from './ImageViewer';
 import { ValidationControls } from './ValidationControls';
 import { ProgressBar } from './ProgressBar';
 import { useDetectionData } from '../hooks/useDetectionData';
-import { FileImage } from 'lucide-react';
+import { FileImage, SkipForward, SkipBack } from 'lucide-react';
 import { Detection } from '../types';
 
 // Placeholder handling
@@ -29,8 +29,10 @@ export const ValidationPage: React.FC = () => {
     getTotalDetections,
     getValidatedCount,
     getProgress,
+    moveToNextImage,
+    moveToPrevImage,
     currentImageIndex,
-    imageData
+    windowData
   } = useDetectionData();
 
   const [cacheBust, setCacheBust] = useState(Date.now());
@@ -38,9 +40,9 @@ export const ValidationPage: React.FC = () => {
   // regenerate cacheBust whenever dataset or index changes
   useEffect(() => {
     setCacheBust(Date.now());
-  }, [imageData, currentImageIndex]);
+  }, [windowData, currentImageIndex]);
 
-  const isUsingPlaceholder = imageData.length === 0;
+  const isUsingPlaceholder = windowData.length === 0;
 
   // Current image + cache bust
   const currentImage = getCurrentImage();
@@ -48,13 +50,16 @@ export const ValidationPage: React.FC = () => {
 
   // Current detection + crop + cache bust
   const currentDetection = isUsingPlaceholder ? PLACEHOLDER_DETECTION : getCurrentDetection();
+  if (!currentDetection) {
+    return <p>All images validated or no detection available.</p>;
+  }
   const cropPath = getCurrentCropPath();
   const cropSrc = (cropPath || PLACEHOLDER_IMAGE.path) + `?t=${cacheBust}`;
 
   // Progress bar text
   const progressText = isUsingPlaceholder
     ? "Preview Mode (No dataset found)"
-    : `Image ${currentImageIndex + 1}/${imageData.length} - ${currentImage?.uploaded_img}`;
+    : `Image ${currentImageIndex + 1} - ${currentImage?.uploaded_img}`;
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -76,11 +81,26 @@ export const ValidationPage: React.FC = () => {
             current={getValidatedCount()}
             total={getTotalDetections()}
           />
+          <div className="flex gap-2">
+            <button
+              onClick={moveToPrevImage}
+              className="flex items-center gap-1 bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-md hover:shadow-lg"
+            >
+              <SkipBack size={16} />
+              Prev Image
+            </button>
+            <button
+              onClick={moveToNextImage}
+              className="flex items-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-md hover:shadow-lg"
+            >
+              Next Image
+              <SkipForward size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Main Content */}
         <div className="max-w-8xl mx-auto grid grid-cols-4 grid-rows-2 gap-3">
-          
           {/* Full Image */}
           <div className="row-start-1 col-start-1 col-end-3 bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">

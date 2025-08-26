@@ -76,7 +76,7 @@ class PlantDefectDetector:
 
         return save_path
 
-    def predict(self, image: np.ndarray, return_image: bool, conf_threshold: float = 0.8):
+    def predict(self, image: np.ndarray, return_image: bool, conf_threshold: float = 0.5):
         if not self.is_loaded:
             raise Exception("Model not loaded")
 

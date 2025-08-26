@@ -192,12 +192,18 @@ async def upload_images(files: List[UploadFile] = File(...)):
     input_dir = "uploaded_img"
     os.makedirs(input_dir, exist_ok=True)
     saved_files = []
+    skipped_files = []
 
     for file in files:
-        file_extension = os.path.splitext(file.filename)[1] or ".jpg"
         saved_filename = f"{file.filename}"
         file_path = os.path.join(input_dir, saved_filename)
 
+        # Check if file already exists
+        if os.path.exists(file_path):
+            logger.info(f"Skipped duplicate file: {file_path}")
+            skipped_files.append(saved_filename)
+            continue  # skip saving
+        # Save new file
         contents = await file.read()
         with open(file_path, "wb") as f:
             f.write(contents)
@@ -244,6 +250,34 @@ async def download_annotations():
     except Exception as e:
         logger.error(f"Download annotations failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/clear-folder/{folder_type}")
+def clear_folder(folder_type: str):
+
+    FOLDER_PATHS = { "uploaded": "uploaded_img", "processed": "processed_img", "converted": "yolov11"}
+    folder = FOLDER_PATHS.get(folder_type.lower())
+
+    if folder is None:
+        raise HTTPException(status_code=400, detail="Invalid folder type. Use uploaded, processed, or converted.")
+
+    if not os.path.exists(folder):
+        raise HTTPException(status_code=404, detail=f"Folder '{folder}' does not exist.")
+
+    files = os.listdir(folder)
+    if not files:  # empty
+        return {"message": "folder is empty already!"}
+
+    for f in files:
+        file_path = os.path.join(folder, f)
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error deleting {file_path}: {str(e)}")
+
+    return {"message": f"All files in '{folder_type}' folder have been deleted."}
 
 #----validation process------------------------------------------
 

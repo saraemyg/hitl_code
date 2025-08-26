@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Trash2 } from 'lucide-react';
 
 interface ProgressBarProps {
   progress: number;
@@ -12,7 +12,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   const [isDetecting, setIsDetecting] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
 
-  // Upload handler
+  // --- Upload handler ---
   const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -35,7 +35,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     }
   };
 
-  // Bulk detect handler
+  // --- Bulk detect handler ---
   const handleBulkDetect = async () => {
     try {
       setIsDetecting(true); // show spinner
@@ -58,7 +58,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     }
   };
 
-  // Convert to YOLOv11 handler
+  // --- Convert to YOLOv11 handler ---
   const handleConvertYOLOv11 = async () => {
     try {
       setIsConverting(true);
@@ -78,7 +78,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     }
   };
 
-  // Download YOLOv11 annotations
+  // --- Download Yolov11 handler ---
   const handleDownloadAnnotations = async () => {
     try {
       const response = await fetch('http://localhost:8000/download-annotations', {
@@ -101,6 +101,20 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     } catch (error) {
       console.error("Download failed", error);
       alert("Download failed!");
+    }
+  };
+
+  const clearFolder = async (folderType) => {
+    try {
+      const response = await fetch(`http://localhost:8000/clear-folder/${folderType}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+      alert(data.message || "Something happened!");
+    } catch (error) {
+      console.error("Error clearing folder:", error);
+      alert("Failed to clear folder!");
     }
   };
 
@@ -134,12 +148,22 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
       <div className="flex justify-between items-center text-sm text-gray-600 mt-2">
         <span>Progress: {current}/{total}</span>
         <span>{progress.toFixed(1)}% Complete</span>
-        <button
-          className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          Upload Image
-        </button>
+
+        {/* Upload */}
+        <div className="flex items-center">
+          <button
+            className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Upload Image
+          </button>
+          <button
+            className="ml-1 p-2 bg-red-100 rounded hover:bg-red-200"
+            onClick={() => clearFolder("uploaded")}
+          >
+            <Trash2 size={16} className="text-red-600" />
+          </button>
+        </div>
         
         <input
           type="file"
@@ -150,27 +174,45 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           onChange={handleBulkUpload}
         />
 
-        <button
-          className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-          onClick={handleBulkDetect}
-        >
-          Run Detection
-        </button>
+        {/* Run detection */}
+        <div className="flex items-center">
+          <button
+            className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+            onClick={handleBulkDetect}
+          >
+            Run Detection
+          </button>
+          <button
+            className="ml-1 p-2 bg-red-100 rounded hover:bg-red-200"
+            onClick={() => clearFolder("processed")}
+          >
+            <Trash2 size={16} className="text-red-600" />
+          </button>
+        </div>
 
-        <button
-          className="ml-4 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-          onClick={handleConvertYOLOv11}
-        >
-          Convert to YOLOv11 Format
-        </button>
+        {/* Convert */}
+        <div className="flex items-center">
+          <button
+            className="ml-4 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+            onClick={handleConvertYOLOv11}
+          >
+            Convert to YOLOv11 Format
+          </button>
+          <button
+            className="ml-1 p-2 bg-red-100 rounded hover:bg-red-200"
+            onClick={() => clearFolder("converted")}
+          >
+            <Trash2 size={16} className="text-red-600" />
+          </button>
+        </div>
 
+        {/* Download */}
         <button
           className="ml-4 p-2 bg-gray-200 rounded hover:bg-gray-300"
           onClick={handleDownloadAnnotations}
         >
           <Download size={18} className="text-gray-700" />
         </button>
-
       </div>
     </div>
   );

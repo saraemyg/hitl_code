@@ -58,42 +58,14 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
     }
   };
 
-  // Navigation handlers (no backend calls)
-  const nextDetection = () => {
-    console.log("Next detection:", confidence);
-    onValidate("next");
-  };
-
-  const prevDetection = () => {
-    console.log("Back to previous detection");
-    onValidate("back");
-  };
-  
 return (
     <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-      {/* Header with navigation */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-800">
           Detected: {detectedClass}
         </h3>
-        <div className="flex gap-2">
-          <button
-            onClick={prevDetection}
-            className="flex items-center gap-1 bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-md hover:shadow-lg"
-          >
-            <SkipBack size={16} />
-            Back
-          </button>
-          <button
-            onClick={nextDetection}
-            className="flex items-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-md hover:shadow-lg"
-          >
-            Next
-            <SkipForward size={16} />
-          </button>
-        </div>
       </div>
-
       <p className="text-gray-600 text-center">Please validate this detection:</p>
 
       {/* Validation buttons */}
