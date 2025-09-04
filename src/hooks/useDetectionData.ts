@@ -158,6 +158,15 @@ export const useDetectionData = () => {
     }
   };
 
+  const goToImage = (index: number) => {
+  if (index >= 0 && index < metadataRef.current.length) {
+    setCurrentImageIndex(index);
+    setCurrentDetectionIndex(0);
+    updateWindow(index);
+  }
+};
+
+
   // --- Progress helpers ---
   const getTotalDetections = () =>
     metadataRef.current.reduce(
@@ -178,7 +187,7 @@ export const useDetectionData = () => {
     return total > 0 ? (validated / total) * 100 : 0;
   };
 
-  // --- NEW: total image count (global, not windowData.length) ---
+  // --- total image count (global, not windowData.length) ---
   const getImageCount = () => metadataRef.current.length;
 
   return {
@@ -209,5 +218,6 @@ export const useDetectionData = () => {
     moveToNext, // detection-first
     moveToNextImage,
     moveToPrevImage,
+    goToImage,
   };
 };

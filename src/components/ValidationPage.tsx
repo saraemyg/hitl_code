@@ -31,11 +31,14 @@ export const ValidationPage: React.FC = () => {
     getProgress,
     moveToNextImage,
     moveToPrevImage,
+    goToImage,
+    getImageCount,
     currentImageIndex,
     windowData
   } = useDetectionData();
 
   const [cacheBust, setCacheBust] = useState(Date.now());
+  const [jumpIndex, setJumpIndex] = useState<number | ''>('');
 
   // regenerate cacheBust whenever dataset or index changes
   useEffect(() => {
@@ -81,7 +84,9 @@ export const ValidationPage: React.FC = () => {
             current={getValidatedCount()}
             total={getTotalDetections()}
           />
-          <div className="flex gap-2">
+
+          <div className="flex items-center gap-2 mt-4">
+            {/* Prev button */}
             <button
               onClick={moveToPrevImage}
               className="flex items-center gap-1 bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-md hover:shadow-lg"
@@ -89,6 +94,8 @@ export const ValidationPage: React.FC = () => {
               <SkipBack size={16} />
               Prev Image
             </button>
+
+            {/* Next button */}
             <button
               onClick={moveToNextImage}
               className="flex items-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-md hover:shadow-lg"
@@ -96,6 +103,32 @@ export const ValidationPage: React.FC = () => {
               Next Image
               <SkipForward size={16} />
             </button>
+
+            {/* Jump to Image (inline on the same row) */}
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                className="w-24 px-2 py-1 border rounded text-sm"
+                placeholder="Go to #"
+                min={1}
+                max={getImageCount()}
+                value={jumpIndex}
+                onChange={(e) =>
+                  setJumpIndex(e.target.value ? parseInt(e.target.value) : '')
+                }
+              />
+              <button
+                className="px-3 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 text-sm"
+                onClick={() => {
+                  if (jumpIndex !== '' && !isNaN(jumpIndex)) {
+                    goToImage(jumpIndex - 1); // convert to 0-based
+                    setJumpIndex('');
+                  }
+                }}
+              >
+                Go
+              </button>
+            </div>
           </div>
         </div>
 
@@ -117,15 +150,27 @@ export const ValidationPage: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Detected Region (Cropped)
             </h3>
-            <ImageViewer
-              imageSrc={cropSrc}
-              detection={currentDetection}
-              // className="aspect-square"
-            />
+
+            <div className="relative inline-block">
+              {/* Image */}
+              <ImageViewer
+                imageSrc={cropSrc}
+                detection={currentDetection}
+                className="rounded-lg"
+              />
+
+              {/* Checkmark overlay */}
+              {(currentDetection.status === "validated" ||
+                currentDetection.status === "healthy") && (
+                <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1 shadow-lg z-10">
+                  ✔
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Validation Controls */}
-          <div className="row-start-2 col-start-3 col-end-5 bg-white rounded-lg shadow-lg p-6 flex flex-col justify-top">
+          <div className="row-start-2 col-start-2 col-end-5 bg-white rounded-lg shadow-lg p-6 flex flex-col justify-top">
             <ValidationControls
               onValidate={validateDetection}
               detectedClass={currentDetection.defect_type}
@@ -134,7 +179,7 @@ export const ValidationPage: React.FC = () => {
           </div>
 
           {/* Detection Info */}
-          <div className="row-start-2 col-start-1 col-end-3 bg-white rounded-lg shadow-lg p-6">
+          <div className="row-start-2 col-start-1 col-end-1 bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Detection Details
             </h3>
@@ -158,6 +203,12 @@ export const ValidationPage: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-gray-600">Detection ID:</span>
                 <span className="font-mono text-sm">{currentDetection.defect_id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Status:</span>
+                <span className="font-semibold">
+                  {currentDetection.status || "Unvalidated"}
+                </span>
               </div>
             </div>
           </div>

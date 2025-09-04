@@ -37,7 +37,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
         ref={imgRef}
         src={imageSrc}
         alt="Plant detection"
-        className="h-full w-auto object-contain"  // ✅ keep aspect ratio
+        className="h-full w-auto object-contain"  // keep aspect ratio
         onLoad={handleImageLoad}
       />
     </div>

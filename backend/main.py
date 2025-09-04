@@ -136,6 +136,15 @@ async def bulk_detect():
     output_dir = "processed_img"
     os.makedirs(output_dir, exist_ok=True)
 
+    metadata_path = os.path.join(output_dir, "detection_metadata.json")
+
+    # Load old metadata if exists
+    if os.path.exists(metadata_path):
+        with open(metadata_path, "r") as f:
+            existing_metadata = {item["uploaded_img"]: item for item in json.load(f)}
+    else:
+        existing_metadata = {}
+
     results = []
     image_files = [f for f in os.listdir(input_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
 
@@ -149,21 +158,37 @@ async def bulk_detect():
 
             detections, annotated_image = detector.predict(image_array, return_image=True)
 
-            # Save annotated image
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            annotated_filename = f"{timestamp}_{image_file}_processed.jpg"
+            # Reuse old processed filename if available, otherwise generate new one
+            if image_file in existing_metadata and "processed_img" in existing_metadata[image_file]:
+                annotated_filename = existing_metadata[image_file]["processed_img"]
+            else:
+                annotated_filename = f"{os.path.splitext(image_file)[0]}_processed.jpg"
+
             annotated_path = os.path.join(output_dir, annotated_filename)
+
+            # Save/update annotated image (overwrite safely)
             if annotated_image is not None:
                 annotated_rgb = annotated_image[..., ::-1]
                 annotated_pil = Image.fromarray(annotated_rgb)
                 annotated_pil.save(annotated_path)
 
-            results.append({
+            new_entry = {
                 "uploaded_img": image_file,
                 "processed_img": annotated_filename,
                 "detections": detections,
                 "defect_count": len(detections)
-            })
+            }
+
+            # If image exists already in metadata, preserve validated statuses
+            if image_file in existing_metadata:
+                old_entry = existing_metadata[image_file]
+
+                old_detections = {d["defect_id"]: d for d in old_entry.get("detections", [])}
+                for det in new_entry["detections"]:
+                    if det["defect_id"] in old_detections:
+                        det["status"] = old_detections[det["defect_id"]].get("status", "unvalidated")
+
+            results.append(new_entry)
 
         except Exception as e:
             logger.error(f"Failed to process {image_file}: {e}")
@@ -172,8 +197,7 @@ async def bulk_detect():
                 "error": str(e)
             })
 
-    # Save metadata to a JSON file
-    metadata_path = os.path.join(output_dir, "detection_metadata.json")
+    # Save merged metadata
     with open(metadata_path, "w") as f:
         json.dump(results, f, indent=2)
 
