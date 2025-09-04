@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, X, AlertTriangle, SkipForward, SkipBack } from 'lucide-react';
+import { Check, X, AlertTriangle, Trash2 } from 'lucide-react';
 import { DEFECT_CLASSES } from '../types';
 
 interface ValidationControlsProps {
@@ -59,68 +59,67 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
   };
 
 return (
-    <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800">
-          Detected: {detectedClass}
-        </h3>
-      </div>
+  <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
+    {/* Header */}
+    <div className="flex items-center justify-between">
+      <h3 className="text-lg font-semibold text-gray-800">
+        Detected: {detectedClass}
+      </h3>
       <p className="text-gray-600 text-center">Please validate this detection:</p>
+    </div>
+    
+    {/* Validation + Other/Delete buttons in one row */}
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+      {/* Correct */}
+      <button
+        onClick={() => validateDetection("correct", detectedClass)}
+        className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
+      >
+        <Check size={20} />
+        Correct
+      </button>
 
-      {/* Validation buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button
-          onClick={() => validateDetection("correct", detectedClass)}
-          className="flex items-center justify-center gap-3 bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
+      {/* Healthy */}
+      <button
+        onClick={() => validateDetection("healthy", detectedClass)}
+        className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
+      >
+        <X size={20} />
+        Healthy
+      </button>
+
+      {/* Other */}
+      <div className="flex gap-2 col-span-3">
+        <select
+          value={selectedClass}
+          onChange={(e) => setSelectedClass(e.target.value)}
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
         >
-          <Check size={24} />
-          Correct Defect
-        </button>
-
+          {DEFECT_CLASSES.map(className => (
+            <option key={className} value={className}>
+              {className}
+            </option>
+          ))}
+        </select>
         <button
-          onClick={() => validateDetection("healthy", detectedClass)}
-          className="flex items-center justify-center gap-3 bg-blue-500 hover:bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
+          onClick={() => validateDetection("other", selectedClass)}
+          className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg"
         >
-          <X size={24} />
-          Healthy (No Defect)
+          <AlertTriangle size={18} />
+          Other
         </button>
-      </div>
-
-      {/* Other / delete */}
-      <div className="border-t pt-6 space-y-4">
-        <label className="block text-sm font-medium text-gray-700">
-          Or select different defect type:
-        </label>
-        <div className="flex gap-3">
-          <select
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-          >
-            {DEFECT_CLASSES.map(className => (
-              <option key={className} value={className}>
-                {className}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => validateDetection("other", selectedClass)}
-            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
-          >
-            <AlertTriangle size={20} />
-            Confirm Other
-          </button>
-        </div>
-
-        <button
-          onClick={deleteDetection}
-          className="w-full flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
-        >
-          <X size={20} />
-          Delete Detection
-        </button>
+        {/* Delete (trash icon only) */}
+      <button
+        onClick={deleteDetection}
+        className="flex items-center justify-center bg-red-500 hover:bg-red-600 text-white p-3 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
+        title="Delete Detection"
+      >
+        <Trash2 size={20} />
+      </button>
       </div>
     </div>
-  );
+  </div>
+);
+
+
 };

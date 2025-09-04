@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ImageViewer } from './ImageViewer';
-import { ValidationControls } from './ValidationControls';
-import { ProgressBar } from './ProgressBar';
+import { ImageViewer } from '../components/ImageViewer';
+import { ValidationControls } from '../components/ValidationControls';
+import { ProgressBar } from '../components/ProgressBar';
 import { useDetectionData } from '../hooks/useDetectionData';
 import { FileImage, SkipForward, SkipBack } from 'lucide-react';
 import { Detection } from '../types';
@@ -179,7 +179,7 @@ export const ValidationPage: React.FC = () => {
           </div>
 
           {/* Detection Info */}
-          <div className="row-start-2 col-start-1 col-end-1 bg-white rounded-lg shadow-lg p-6">
+          <div className="row-start-2 row-end-2 col-start-1 col-end-1 bg-white rounded-lg shadow-lg p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Detection Details
             </h3>
@@ -203,12 +203,6 @@ export const ValidationPage: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-gray-600">Detection ID:</span>
                 <span className="font-mono text-sm">{currentDetection.defect_id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Status:</span>
-                <span className="font-semibold">
-                  {currentDetection.status || "Unvalidated"}
-                </span>
               </div>
             </div>
           </div>
