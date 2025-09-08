@@ -2,17 +2,24 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { ValidationPage } from './pages/ValidationPage';
 import SummaryPage from './pages/SummaryPage';
+import Annotation from './pages/AnnotationPage'; 
+import AnnotationPage from './pages/AnnotationPage';
 
 function App() {
   return (
     <Router>
+      {/* Navigation Bar */}
       <nav className="bg-gray-100 p-4 flex gap-4">
         <Link to="/" className="font-semibold text-blue-600">Summary</Link>
         <Link to="/validate" className="font-semibold text-green-600">Validation</Link>
+        <Link to="/annotation" className="font-semibold text-purple-600">Annotation</Link> {/* ✅ new link */}
       </nav>
+
+      {/* Routes */}
       <Routes>
         <Route path="/" element={<SummaryPage />} />
         <Route path="/validate" element={<ValidationPage />} />
+        <Route path="/annotation" element={<AnnotationPage />} /> 
       </Routes>
     </Router>
   );

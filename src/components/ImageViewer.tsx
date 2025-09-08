@@ -63,7 +63,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
     setIsDragging(false);
   };
 
-  // ✅ Double-click resets zoom + pan
+  // Double-click resets zoom + pan
   const handleDoubleClick = () => {
     setScale(1);
     setOffset({ x: 0, y: 0 });
@@ -78,7 +78,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      onDoubleClick={handleDoubleClick} // 👈 added here
+      onDoubleClick={handleDoubleClick}
     >
       <img
         ref={imgRef}

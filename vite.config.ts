@@ -7,4 +7,12 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  server: {
+    proxy: {
+      "/metadata": "http://localhost:8000",
+      "/processed_img": "http://localhost:8000",
+    },
+  }
+
 })
+

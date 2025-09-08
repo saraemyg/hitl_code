@@ -28,6 +28,9 @@ const fetchDetectionMetadata = async (): Promise<ImageData[]> => {
   }));
 };
 
+// Add FilterStatus type at the top
+export type FilterStatus = 'all' | 'validated' | 'unvalidated';
+
 export const useDetectionData = () => {
   // Store raw metadata outside state
   const metadataRef = useRef<ImageData[]>([]);
@@ -41,18 +44,37 @@ export const useDetectionData = () => {
 
   const [validationResults, setValidationResults] = useState<any[]>([]);
 
-  // --- NEW helper functions to find next/prev images with detections ---
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+
+  // Add filtered metadata getter
+  const getFilteredMetadata = () => {
+    return metadataRef.current.filter(img => {
+      if (filterStatus === 'all') return true;
+      
+      return img.detections.some(det => {
+        if (filterStatus === 'validated') {
+          return det.status === 'validated';
+        }
+        if (filterStatus === 'unvalidated') {
+          return det.status === 'unvalidated';
+        }
+        return true;
+      });
+    });
+  };
+
+    // Update navigation functions
   const findNextImageWithDetections = (start: number) => {
-    const data = metadataRef.current;
+    const filteredData = getFilteredMetadata();
     let i = start + 1;
-    while (i < data.length && data[i].detections.length === 0) i++;
-    return i < data.length ? i : -1;
+    while (i < filteredData.length && filteredData[i].detections.length === 0) i++;
+    return i < filteredData.length ? i : -1;
   };
 
   const findPrevImageWithDetections = (start: number) => {
-    const data = metadataRef.current;
+    const filteredData = getFilteredMetadata();
     let i = start - 1;
-    while (i >= 0 && data[i].detections.length === 0) i--;
+    while (i >= 0 && filteredData[i].detections.length === 0) i--;
     return i >= 0 ? i : -1;
   };
 
@@ -87,7 +109,10 @@ export const useDetectionData = () => {
   };
 
   // --- Getters for current image/detection ---
-  const getCurrentImage = () => metadataRef.current[currentImageIndex];
+  const getCurrentImage = () => {
+    const filteredData = getFilteredMetadata();
+    return filteredData[currentImageIndex];
+  };
   const getCurrentDetection = () =>
     getCurrentImage()?.detections[currentDetectionIndex];
   const getCurrentCropPath = () => getCurrentDetection()?.crop_path ?? null;

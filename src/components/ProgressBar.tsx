@@ -1,6 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { Download, Trash2 } from 'lucide-react';
 
+// Add available models
+const AVAILABLE_MODELS = [
+  { id: 'HQx1280', name: 'High Quality 1280px' },
+  { id: 'modelv4_l_0.2', name: 'Model v4 Large' }
+];
+
 interface ProgressBarProps {
   progress: number;
   current: number;
@@ -11,6 +17,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
 
   // --- Upload handler ---
   const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,26 +42,28 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     }
   };
 
-  // --- Bulk detect handler ---
+  // --- Modified bulk detect handler with model selection ---
   const handleBulkDetect = async () => {
     try {
-      setIsDetecting(true); // show spinner
+      setIsDetecting(true);
       const response = await fetch('http://localhost:8000/bulk-detect', {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ model: selectedModel })
       });
 
       const result = await response.json();
       console.log(result);
 
       alert(`Processed ${result.processed} images!`);
-
-      // refresh the page after detection
       window.location.reload();
     } catch (error) {
       console.error("Detection failed", error);
       alert("Detection failed!");
     } finally {
-      setIsDetecting(false); // hide spinner
+      setIsDetecting(false);
     }
   };
 
@@ -104,14 +113,23 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     }
   };
 
-  const clearFolder = async (folderType) => {
+  // --- Clear folder with confirmation ---
+  const clearFolder = async (folderType: string) => {
+    // Show confirmation dialog
+    const confirmed = window.confirm(`Are you sure you want to clear all ${folderType} images? This action cannot be undone.`);
+    
+    if (!confirmed) return;
+
     try {
       const response = await fetch(`http://localhost:8000/clear-folder/${folderType}`, {
         method: "DELETE",
       });
 
       const data = await response.json();
-      alert(data.message || "Something happened!");
+      alert(data.message || "Folder cleared successfully!");
+      
+      // Optionally refresh the page
+      window.location.reload();
     } catch (error) {
       console.error("Error clearing folder:", error);
       alert("Failed to clear folder!");
@@ -160,6 +178,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           <button
             className="ml-1 p-2 bg-red-100 rounded hover:bg-red-200"
             onClick={() => clearFolder("uploaded")}
+            title="Clear uploaded images"
           >
             <Trash2 size={16} className="text-red-600" />
           </button>
@@ -174,17 +193,30 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           onChange={handleBulkUpload}
         />
 
-        {/* Run detection */}
-        <div className="flex items-center">
+        {/* Model selector and detection buttons */}
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="px-2 py-1 border rounded bg-white"
+          >
+            {AVAILABLE_MODELS.map(model => (
+              <option key={model.id} value={model.id}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+          
           <button
-            className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
             onClick={handleBulkDetect}
           >
             Run Detection
           </button>
           <button
-            className="ml-1 p-2 bg-red-100 rounded hover:bg-red-200"
+            className="p-2 bg-red-100 rounded hover:bg-red-200"
             onClick={() => clearFolder("processed")}
+            title="Clear processed images"
           >
             <Trash2 size={16} className="text-red-600" />
           </button>
@@ -201,6 +233,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           <button
             className="ml-1 p-2 bg-red-100 rounded hover:bg-red-200"
             onClick={() => clearFolder("converted")}
+            title="Clear converted files"
           >
             <Trash2 size={16} className="text-red-600" />
           </button>

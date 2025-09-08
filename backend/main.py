@@ -68,11 +68,86 @@ async def get_metadata():
         return JSONResponse(content=metadata)
     return JSONResponse(content={"error": "No metadata found"}, status_code=404)
 
+#----validation process------------------------------------------
+
+def load_metadata():
+    if not os.path.exists(metadata_path):
+        return []
+    with open(metadata_path, "r") as f:
+        metadata = json.load(f)
+    # Clean metadata: only keep detections where crop file actually exists
+    cleaned_metadata = []
+    for item in metadata:
+        valid_detections = []
+        for det in item.get("detections", []):
+            crop_path = det.get("crop_path")
+            if crop_path and os.path.exists(crop_path.replace("\\", "/")):
+                valid_detections.append(det)
+        item["detections"] = valid_detections
+        cleaned_metadata.append(item)
+    return cleaned_metadata
+
+def save_metadata(metadata):
+    # Always use the fixed path, not an argument
+    os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+@app.patch("/detections/{confidence}/validate")
+async def validate_detection(confidence: int, body: dict = Body(...)):
+    metadata = load_metadata()
+    updated = None
+
+    for item in metadata:
+        for det in item.get("detections", []):
+            if det["confidence"] == confidence:  # exact string match
+                decision = body.get("decision")
+                if decision == "correct":
+                    det["status"] = "validated"
+                elif decision == "healthy":
+                    det["status"] = "healthy"
+                elif decision == "other":
+                    det["status"] = "validated"
+                    if "defect_type" in body:
+                        det["defect_type"] = body["defect_type"]
+                updated = det
+                break
+        if updated:
+            break
+
+    if not updated:
+        raise HTTPException(status_code=404, detail="Detection not found")
+
+    save_metadata(metadata)
+    return {"success": True, "updated": updated}
+
+@app.delete("/detections/{confidence}")
+async def delete_detection(confidence: int):
+    metadata = load_metadata()
+    deleted = None
+
+    for item in metadata:
+        detections = item.get("detections", [])
+        for det in detections:
+            if det["confidence"] == confidence:  # exact string match
+                detections.remove(det)
+                deleted = det
+                break
+        if deleted:
+            break
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Detection not found")
+
+    save_metadata(metadata)
+    return {"success": True, "deleted": deleted}
+
+
 #-----basic process--------------------------------------------
 
-# from fakhrul, use as reference
 @app.post("/detect")
 async def detect_defects(file: UploadFile = File(...)):
+    # from fakhrul, use as reference
     logger.info(f"Detect route endpoint was called with file: {file.filename}")
     start_time = time.time()
 
@@ -131,7 +206,8 @@ async def detect_defects(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/bulk-detect")
-async def bulk_detect():
+async def bulk_detect(data: dict):
+    model_name = data.get("model", "HQx1280")  # Default to HQx1280 if not specified
     input_dir = "uploaded_img"
     output_dir = "processed_img"
     os.makedirs(output_dir, exist_ok=True)
@@ -209,10 +285,9 @@ async def bulk_detect():
         "results": results
     }
 
-# Save multiple uploaded images to the uploaded_img folder.
 @app.post("/upload-images")
 async def upload_images(files: List[UploadFile] = File(...)):
-    
+    # Save multiple uploaded images to the uploaded_img folder.
     input_dir = "uploaded_img"
     os.makedirs(input_dir, exist_ok=True)
     saved_files = []
@@ -302,80 +377,6 @@ def clear_folder(folder_type: str):
             raise HTTPException(status_code=500, detail=f"Error deleting {file_path}: {str(e)}")
 
     return {"message": f"All files in '{folder_type}' folder have been deleted."}
-
-#----validation process------------------------------------------
-
-def load_metadata():
-    if not os.path.exists(metadata_path):
-        return []
-    with open(metadata_path, "r") as f:
-        metadata = json.load(f)
-    # Clean metadata: only keep detections where crop file actually exists
-    cleaned_metadata = []
-    for item in metadata:
-        valid_detections = []
-        for det in item.get("detections", []):
-            crop_path = det.get("crop_path")
-            if crop_path and os.path.exists(crop_path.replace("\\", "/")):
-                valid_detections.append(det)
-        item["detections"] = valid_detections
-        cleaned_metadata.append(item)
-    return cleaned_metadata
-
-def save_metadata(metadata):
-    # Always use the fixed path, not an argument
-    os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
-    with open(metadata_path, "w") as f:
-        json.dump(metadata, f, indent=2)
-
-@app.patch("/detections/{confidence}/validate")
-async def validate_detection(confidence: int, body: dict = Body(...)):
-    metadata = load_metadata()
-    updated = None
-
-    for item in metadata:
-        for det in item.get("detections", []):
-            if det["confidence"] == confidence:  # exact string match
-                decision = body.get("decision")
-                if decision == "correct":
-                    det["status"] = "validated"
-                elif decision == "healthy":
-                    det["status"] = "healthy"
-                elif decision == "other":
-                    det["status"] = "validated"
-                    if "defect_type" in body:
-                        det["defect_type"] = body["defect_type"]
-                updated = det
-                break
-        if updated:
-            break
-
-    if not updated:
-        raise HTTPException(status_code=404, detail="Detection not found")
-
-    save_metadata(metadata)
-    return {"success": True, "updated": updated}
-
-@app.delete("/detections/{confidence}")
-async def delete_detection(confidence: int):
-    metadata = load_metadata()
-    deleted = None
-
-    for item in metadata:
-        detections = item.get("detections", [])
-        for det in detections:
-            if det["confidence"] == confidence:  # exact string match
-                detections.remove(det)
-                deleted = det
-                break
-        if deleted:
-            break
-
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Detection not found")
-
-    save_metadata(metadata)
-    return {"success": True, "deleted": deleted}
 
 
 if __name__ == "__main__":
