@@ -136,20 +136,40 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     }
   };
 
-  // Spinner view -> please fix this haha buruk namam
+  // Spinner / Loading Overlay
   if (isDetecting || isConverting) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
-        <div className="text-center bg-white rounded-lg shadow-xl p-12 max-w-md">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            {isDetecting ? "Running bulk detection..." : "Converting to YOLOv11 format..."}
-          </h2>
-          <p className="text-gray-600">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+        <div className="relative bg-white rounded-2xl shadow-2xl p-10 max-w-lg w-full text-center">
+          {/* Spinner circle */}
+          <div className="relative flex items-center justify-center mb-6">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-green-500 border-opacity-70"></div>
+            <span className="absolute text-lg font-semibold text-gray-700">
+              {progress}%
+            </span>
+          </div>
+
+          {/* Title */}
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">
             {isDetecting
-              ? "Please wait while AI processes your images."
+              ? "Running Bulk Detection..."
+              : "Converting to YOLOv11 Format..."}
+          </h2>
+
+          {/* Description */}
+          <p className="text-gray-600 mb-6">
+            {isDetecting
+              ? `Processing images... (${progress})`
               : "Please wait while dataset is being converted."}
-          </p>    
+          </p>
+
+          {/* Progress bar */}
+          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div
+              className="bg-green-500 h-3 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
         </div>
       </div>
     );
@@ -159,10 +179,11 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     <div className="w-full">
       <div className="bg-gray-200 rounded-full h-3 mb-4">
         <div 
-          className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-300 ease-out"
+          className="bg-gradient-to-r from-blue-500 to-red-500 h-3 rounded-full transition-all duration-300 ease-out"
           style={{ width: `${progress}%` }}
         />
       </div>
+
       <div className="flex justify-between items-center text-sm text-gray-600 mt-2">
         <span>Progress: {current}/{total}</span>
         <span>{progress.toFixed(1)}% Complete</span>
@@ -183,7 +204,6 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
             <Trash2 size={16} className="text-red-600" />
           </button>
         </div>
-        
         <input
           type="file"
           accept="image/*"

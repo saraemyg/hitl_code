@@ -59,6 +59,7 @@ def root():
     return {"message": "hello haha world"}
 
 # New endpoint to always fetch fresh metadata
+# PLEASE OPTIMISE THIS HAHA
 @app.get("/metadata")
 async def get_metadata():
     metadata_path = os.path.join("processed_img", "detection_metadata.json")
@@ -76,6 +77,7 @@ def load_metadata():
     with open(metadata_path, "r") as f:
         metadata = json.load(f)
     # Clean metadata: only keep detections where crop file actually exists
+    # Fix here for issue with 'healthy' image for viewing
     cleaned_metadata = []
     for item in metadata:
         valid_detections = []
@@ -88,7 +90,6 @@ def load_metadata():
     return cleaned_metadata
 
 def save_metadata(metadata):
-    # Always use the fixed path, not an argument
     os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
     with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=2)
@@ -96,52 +97,98 @@ def save_metadata(metadata):
 @app.patch("/detections/{confidence}/validate")
 async def validate_detection(confidence: int, body: dict = Body(...)):
     metadata = load_metadata()
-    updated = None
-
+    decision = body.get("decision")
+    status_map = { "correct": "validated", "healthy": "healthy", 
+                  "other": "validated", "uncertain": "uncertain",}
     for item in metadata:
         for det in item.get("detections", []):
-            if det["confidence"] == confidence:  # exact string match
-                decision = body.get("decision")
-                if decision == "correct":
-                    det["status"] = "validated"
-                elif decision == "healthy":
-                    det["status"] = "healthy"
-                elif decision == "other":
-                    det["status"] = "validated"
-                    if "defect_type" in body:
-                        det["defect_type"] = body["defect_type"]
-                updated = det
-                break
-        if updated:
-            break
-
-    if not updated:
-        raise HTTPException(status_code=404, detail="Detection not found")
-
-    save_metadata(metadata)
-    return {"success": True, "updated": updated}
+            if det.get("confidence") == confidence:
+                if decision in status_map:
+                    det["status"] = status_map[decision]
+                if decision == "other" and "defect_type" in body:
+                    det["defect_type"] = body["defect_type"]
+                # Save metadata back
+                save_metadata(metadata)
+                return {"updated": det}
+    return {"error": "Detection not found"}
 
 @app.delete("/detections/{confidence}")
 async def delete_detection(confidence: int):
     metadata = load_metadata()
     deleted = None
-
     for item in metadata:
         detections = item.get("detections", [])
         for det in detections:
-            if det["confidence"] == confidence:  # exact string match
+            if det["confidence"] == confidence: 
                 detections.remove(det)
                 deleted = det
                 break
         if deleted:
             break
-
     if not deleted:
         raise HTTPException(status_code=404, detail="Detection not found")
-
     save_metadata(metadata)
     return {"success": True, "deleted": deleted}
 
+# Add this new endpoint after your existing endpoints
+
+@app.patch("/update-detection")
+async def update_detection(body: dict = Body(...)):
+    """Update detection bbox and metadata"""
+    try:
+        image_name = body.get("image_name")
+        detection_id = body.get("detection_id")
+        new_bbox = body.get("bbox")
+        new_defect_type = body.get("defect_type")
+        
+        if not all([image_name, detection_id, new_bbox]):
+            raise HTTPException(
+                status_code=400, 
+                detail="Missing required fields: image_name, detection_id, or bbox"
+            )
+
+        # Load existing metadata
+        metadata = load_metadata()
+        
+        # Find the image and detection
+        image_found = False
+        detection_updated = False
+        
+        for image in metadata:
+            if image["uploaded_img"] == image_name:
+                image_found = True
+                for detection in image["detections"]:
+                    if detection["defect_id"] == detection_id:
+                        # Update bbox
+                        detection["bbox"] = new_bbox
+                        # Update defect type if provided
+                        if new_defect_type:
+                            detection["defect_type"] = new_defect_type
+                        detection_updated = True
+                        break
+                break
+        
+        if not image_found:
+            raise HTTPException(status_code=404, detail="Image not found")
+        if not detection_updated:
+            raise HTTPException(status_code=404, detail="Detection not found")
+
+        # Save updated metadata
+        save_metadata(metadata)
+
+        return {
+            "success": True,
+            "message": "Detection updated successfully",
+            "updated_detection": {
+                "defect_id": detection_id,
+                "bbox": new_bbox,
+                "defect_type": new_defect_type if new_defect_type else None
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating detection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 #-----basic process--------------------------------------------
 

@@ -113,8 +113,7 @@ export const useDetectionData = () => {
     const filteredData = getFilteredMetadata();
     return filteredData[currentImageIndex];
   };
-  const getCurrentDetection = () =>
-    getCurrentImage()?.detections[currentDetectionIndex];
+  const getCurrentDetection = () => getCurrentImage()?.detections[currentDetectionIndex];
   const getCurrentCropPath = () => getCurrentDetection()?.crop_path ?? null;
 
   // --- Validation ---

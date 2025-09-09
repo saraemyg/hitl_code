@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Detection } from "../types";
-import { FileImage } from 'lucide-react';
+import { FileImage, Palette } from 'lucide-react';
 
 // not very scalable but works for now
 export const NEW_DEFECT_CLASSES = [
@@ -16,7 +16,6 @@ export const NEW_DEFECT_CLASSES = [
 ];
 
 const SummaryPage: React.FC = () => {
-  const navigate = useNavigate();
   const [groupedCrops, setGroupedCrops] = useState<Record<string, { src: string; confidence: number }[]>>({});
   const [pageIndex, setPageIndex] = useState<Record<string, number>>({});
   const [showConfidence, setShowConfidence] = useState(false);
@@ -50,7 +49,7 @@ const SummaryPage: React.FC = () => {
       {/* Header */}
       <div className="text-center mb-8">
         <div className="flex items-center justify-center gap-3 mb-4">
-          <FileImage className="text-blue-600" size={32} />
+          <Palette className="text-blue-600" size={32} />
           <h1 className="text-3xl font-bold text-gray-800">Data Visualisation</h1>
           <div className="flex items-center space-x-2">
           <button
@@ -184,8 +183,6 @@ const SummaryPage: React.FC = () => {
               </div>
             );
           })}
-
-
         </div>
       </section>
     </div>

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Check, X, AlertTriangle, Trash2 } from 'lucide-react';
+import { Check, X, AlertTriangle, Trash2, Album } from 'lucide-react';
 import { DEFECT_CLASSES } from '../types';
 
 interface ValidationControlsProps {
-  onValidate: (decision: "correct" | "healthy" | "other" | "next" | "back", className?: string) => void;
+  onValidate: (decision: "correct" | "healthy" | "other" |"uncertain"| "next" | "back", className?: string) => void;
   detectedClass: string;   // YOLO class (for display)
   confidence: number;      // unique identifier from backend
 }
@@ -16,7 +16,7 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
   const [selectedClass, setSelectedClass] = useState(DEFECT_CLASSES[0]);
   
   const validateDetection = async (
-    decision: "correct" | "healthy" | "other",
+    decision: "correct" | "healthy" | "other" | "uncertain" ,
     className?: string
   ) => {
     try {
@@ -70,6 +70,7 @@ return (
     
     {/* Validation + Other/Delete buttons in one row */}
     <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+
       {/* Correct */}
       <button
         onClick={() => validateDetection("correct", detectedClass)}
@@ -88,8 +89,16 @@ return (
         Healthy
       </button>
 
-      {/* Other */}
       <div className="flex gap-2 col-span-3">
+        {/* Uncertain */}
+        <button
+          onClick={() => validateDetection("uncertain", detectedClass)}
+          className="flex items-center justify-center bg-red-500 hover:bg-red-600 text-white p-3 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
+          title="Uncertain Detection"
+        >
+          <Album size={20} />
+        </button>
+        {/* Other */}
         <select
           value={selectedClass}
           onChange={(e) => setSelectedClass(e.target.value)}
@@ -108,14 +117,15 @@ return (
           <AlertTriangle size={18} />
           Other
         </button>
-        {/* Delete (trash icon only) */}
-      <button
-        onClick={deleteDetection}
-        className="flex items-center justify-center bg-red-500 hover:bg-red-600 text-white p-3 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
-        title="Delete Detection"
-      >
-        <Trash2 size={20} />
-      </button>
+        {/* Delete */}
+        <button
+          onClick={deleteDetection}
+          className="flex items-center justify-center bg-red-500 hover:bg-red-600 text-white p-3 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
+          title="Delete Detection"
+        >
+          <Trash2 size={20} />
+        </button>
+
       </div>
     </div>
   </div>
