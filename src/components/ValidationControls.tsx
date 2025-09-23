@@ -1,17 +1,119 @@
-import React, { useState } from 'react';
-import { Check, X, AlertTriangle, Trash2, Album } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Check, X, AlertTriangle, Trash2, Album, ChevronLeft, ChevronRight} from 'lucide-react';
 import { DEFECT_CLASSES } from '../types';
+
+interface Detection {
+  crop_path?: string;
+  defect_type?: string;
+  confidence?: number;
+}
 
 interface ValidationControlsProps {
   onValidate: (decision: "correct" | "healthy" | "other" |"uncertain"| "next" | "back", className?: string) => void;
   detectedClass: string;   // YOLO class (for display)
   confidence: number;      // unique identifier from backend
+  detections?: Detection[];
 }
 
+// CropStrip Sub-component 
+function CropStrip({
+  detections = [],
+  onSelect,
+}: {
+  detections?: Detection[];
+  onSelect: (det: Detection) => void;
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handlePrev = () => {
+    if (currentIndex > 0) {
+      const newIndex = currentIndex - 1;
+      setCurrentIndex(newIndex);
+      onSelect(detections[newIndex]);
+      scrollToIndex(newIndex);
+    }
+  };
+
+  const handleNext = () => {
+    if (detections && currentIndex < detections.length - 1) {
+      const newIndex = currentIndex + 1;
+      setCurrentIndex(newIndex);
+      onSelect(detections[newIndex]);
+      scrollToIndex(newIndex);
+    }
+  };
+
+  const scrollToIndex = (index: number) => {
+    const container = scrollRef.current;
+    if (container) {
+      const child = container.children[index] as HTMLElement;
+      if (child) {
+        container.scrollTo({
+          left:
+            child.offsetLeft - container.clientWidth / 2 + child.clientWidth / 2,
+          behavior: "smooth",
+        });
+      }
+    }
+  };
+
+  // Show real detections if available, otherwise show 5 placeholders
+  const displayItems =
+    detections && detections.length > 0
+      ? detections
+      : Array(5).fill({ crop_path: "https://via.placeholder.com/64" });
+
+  return (
+    <div className="flex items-center space-x-2">
+      {/* Prev button */}
+      <button
+        onClick={handlePrev}
+        disabled={currentIndex === 0}
+        className="p-2 bg-gray-200 rounded-lg disabled:opacity-50"
+      >
+        <ChevronLeft size={18} />
+      </button>
+
+      {/* Crops scroll strip */}
+      <div
+        ref={scrollRef}
+        className="flex overflow-x-auto space-x-2 w-full max-w-3xl scrollbar-hide"
+      >
+        {displayItems.map((det: Detection, idx: number) => (
+          <img
+            key={idx}
+            src={det.crop_path || "https://via.placeholder.com/64"}
+            alt={`Crop ${idx}`}
+            onClick={() => {
+              setCurrentIndex(idx);
+              onSelect(det);
+            }}
+            className={`w-20 h-20 object-cover rounded-lg cursor-pointer border-2 ${
+              idx === currentIndex ? "border-blue-500" : "border-transparent"
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Next button */}
+      <button
+        onClick={handleNext}
+        disabled={detections && currentIndex === detections.length - 1}
+        className="p-2 bg-gray-200 rounded-lg disabled:opacity-50"
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  );
+}
+
+// Validation Controls
 export const ValidationControls: React.FC<ValidationControlsProps> = ({ 
   onValidate, 
-  detectedClass,
-  confidence
+  detectedClass = "Unknown",
+  confidence,
+  detections = [],
 }) => {
   const [selectedClass, setSelectedClass] = useState(DEFECT_CLASSES[0]);
   
@@ -60,12 +162,19 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
 
 return (
   <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
+
+    {/* Crop strip on top */}
+      <CropStrip
+        detections={detections}
+        onSelect={(det) => console.log("Selected detection:", det)}
+      />
+
     {/* Header */}
     <div className="flex items-center justify-between">
       <h3 className="text-lg font-semibold text-gray-800">
         Detected: {detectedClass}
       </h3>
-      <p className="text-gray-600 text-center">Please validate this detection:</p>
+      <p className="text-gray-600 text-left">Please validate this detection:</p>
     </div>
     
     {/* Validation + Other/Delete buttons in one row */}
@@ -129,7 +238,7 @@ return (
       </div>
     </div>
   </div>
-);
-
-
+  );
 };
+
+export default ValidationControls;

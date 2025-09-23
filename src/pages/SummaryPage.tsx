@@ -92,18 +92,19 @@ const SummaryPage: React.FC = () => {
           {/* Palette top-left */}
           <div className="bg-white rounded-lg shadow p-4 flex items-center justify-center">
             <div className="bg-white rounded-lg shadow p-4 flex items-center justify-center aspect-[4/3]">
-              <button
-                onClick={() => setShowConfidence((prev) => !prev)}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg absolute top-2 right-2"
-              >
-                {showConfidence ? "Hide Confidence" : "Show Confidence"}
-              </button>
               <img
                 src="/backend/reference_images/all_classes_palette.png"
                 alt="All Classes Palette"
                 className="w-full h-full object-cover rounded"
               />
             </div>
+            {/* Button now sits with the palette */}
+            <button
+              onClick={() => setShowConfidence((prev) => !prev)}
+              className="mt-3 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg"
+            >
+              {showConfidence ? "Hide Confidence" : "Show Confidence"}
+            </button>
           </div>
 
           {sortedClasses.map((cls) => {

@@ -179,8 +179,9 @@ export const ValidationPage: React.FC = () => {
             <div className="row-start-3 col-start-1 col-end-5 bg-white rounded-lg shadow-lg p-6 flex flex-col justify-top">
               <ValidationControls
                 onValidate={validateDetection}
-                detectedClass={currentDetection.defect_type}
-                confidence={Number(currentDetection.confidence) || 0}
+                detectedClass={isUsingPlaceholder ? PLACEHOLDER_DETECTION.defect_type : (currentDetection?.defect_type ?? "Unknown")}
+                confidence={isUsingPlaceholder ? 0 : Number(currentDetection?.confidence ?? 0)}
+                detections={isUsingPlaceholder ? [PLACEHOLDER_DETECTION] : (currentImage?.detections ?? [])}
               />
             </div>
             

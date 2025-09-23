@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Path
+from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
@@ -52,22 +52,39 @@ app.add_middleware(
 # Serve the outputs folder as static files
 app.mount("/uploaded_img", StaticFiles(directory="uploaded_img"), name="uploaded_img")
 app.mount("/processed_img", StaticFiles(directory="processed_img"), name="processed_img")
-metadata_path = os.path.join("processed_img", "detection_metadata.json")
+metadata_path = "metadata"
 
 @app.get("/")
 def root():
     return {"message": "hello haha world"}
 
-# New endpoint to always fetch fresh metadata
-# PLEASE OPTIMISE THIS HAHA
 @app.get("/metadata")
-async def get_metadata():
-    metadata_path = os.path.join("processed_img", "detection_metadata.json")
-    if os.path.exists(metadata_path):
-        with open(metadata_path, "r") as f:
-            metadata = json.load(f)
-        return JSONResponse(content=metadata)
-    return JSONResponse(content={"error": "No metadata found"}, status_code=404)
+async def get_metadata(file: str = Query(default="detection_metadata.json", description="Metadata file name")):
+    file_path = os.path.join(metadata_path, file)
+
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r") as f:
+                metadata = json.load(f)
+            return JSONResponse(content=metadata)
+        except json.JSONDecodeError:
+            return JSONResponse(
+                content={"error": f"Invalid JSON format in {file}"},
+                status_code=500,
+            )
+
+    return JSONResponse(
+        content={"error": f"Metadata file '{file}' not found"},
+        status_code=404,
+    )
+
+@app.get("/metadata/files")
+async def list_metadata_files():
+    if not os.path.exists(metadata_path):
+        return JSONResponse(content={"files": []})
+    
+    files = [f for f in os.listdir(metadata_path) if f.endswith(".json")]
+    return JSONResponse(content={"files": files})
 
 #----validation process------------------------------------------
 
@@ -130,11 +147,9 @@ async def delete_detection(confidence: int):
     save_metadata(metadata)
     return {"success": True, "deleted": deleted}
 
-# Add this new endpoint after your existing endpoints
-
 @app.patch("/update-detection")
 async def update_detection(body: dict = Body(...)):
-    """Update detection bbox and metadata"""
+    # Update detection bbox and metadata
     try:
         image_name = body.get("image_name")
         detection_id = body.get("detection_id")
