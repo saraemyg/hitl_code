@@ -9,7 +9,7 @@ const SummaryPage: React.FC = () => {
   const [groupedCrops, setGroupedCrops] = useState< Record<string, { src: string; confidence: number }[]>>({});
   const [pageIndex, setPageIndex] = useState<Record<string, number>>({});
   const [showConfidence, setShowConfidence] = useState(false);
-  const [showDashboard, setShowDashboard] = useState(false); //toggle for dashboard overlay
+  const [showDashboard, setShowDashboard] = useState(false); 
 
   useEffect(() => {
     fetch("http://localhost:8000/metadata")
@@ -19,12 +19,12 @@ const SummaryPage: React.FC = () => {
 
         data.forEach((item: any) => {
           item.detections.forEach((det: Detection) => {
-            const type = det.defect_type.replace(/\s+/g, "");
+            const type = det.type.replace(/\s+/g, "");
             if (!groups[type]) groups[type] = [];
-            if (det.crop_path) {
+            if (det.crop) {
               groups[type].push({
-                src: "/" + det.crop_path.replace(/\\/g, "/"),
-                confidence: det.confidence,
+                src: "/" + det.crop.replace(/\\/g, "/"),
+                confidence: det.conf,
               });
             }
           });
@@ -149,7 +149,7 @@ const SummaryPage: React.FC = () => {
                         />
                         {/* overlay confidence */}
                         {showConfidence && (() => {
-                          const percentage = (img.confidence / 1e10) * 100;
+                          const percentage = (img.confidence) * 100;
                           let colorClass = "bg-red-600";
 
                           if (percentage >= 80) {

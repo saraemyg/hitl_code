@@ -1,25 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { ValidationPage } from './pages/ValidationPage';
-import SummaryPage from './pages/SummaryPage';
-import AnnotationPage from './pages/AnnotationPage';
+import React, { useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { ValidationPage } from "./pages/ValidationPage";
+import SummaryPage from "./pages/SummaryPage";
+import AnnotationPage from "./pages/AnnotationPage";
+import { MetadataProvider, useMetadata } from "./context/MetadataContext";
 
-function App() {
-  const [metadataFiles, setMetadataFiles] = useState<string[]>([]);
-  const [selectedMetadata, setSelectedMetadata] = useState<string>("");
+function AppContent() {
+  const { metadataFiles, setMetadataFiles, selectedMetadata, setSelectedMetadata } = useMetadata();
 
   useEffect(() => {
-    // Fetch available metadata files from backend
     fetch("http://localhost:8000/metadata/files")
       .then((res) => res.json())
       .then((data) => {
         setMetadataFiles(data.files || []);
-        if (data.files && data.files.length > 0) {
-          setSelectedMetadata(data.files[0]); // default selection
-        }
       })
       .catch((err) => console.error("Error fetching metadata files:", err));
-  }, []);
+  }, [setMetadataFiles]);
 
   return (
     <Router>
@@ -51,11 +47,18 @@ function App() {
 
       {/* Routes */}
       <Routes>
-      <Route path="/" element={<SummaryPage />} />
-      <Route path="/validate" element={<ValidationPage />} />
-    </Routes>
+        <Route path="/" element={<SummaryPage />} />
+        <Route path="/validate" element={<ValidationPage />} />
+        {/* <Route path="/annotate" element={<AnnotationPage />} /> */}
+      </Routes>
     </Router>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <MetadataProvider>
+      <AppContent />
+    </MetadataProvider>
+  );
+}

@@ -6,12 +6,12 @@ export interface ImageData {
 }
 
 export interface Detection {
-  defect_id: number;
-  defect_type: string;
-  confidence: number; 
+  id: number;
+  type: string;
+  conf: number; 
   bbox: [number, number, number, number]; // [x1, y1, x2, y2]
   status: 'unvalidated' | 'validated' | string; 
-  crop_path: string;
+  crop: string;
 
   // frontend-only
   validated?: boolean;

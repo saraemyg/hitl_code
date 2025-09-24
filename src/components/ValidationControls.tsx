@@ -1,17 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { Check, X, AlertTriangle, Trash2, Album, ChevronLeft, ChevronRight} from 'lucide-react';
-import { DEFECT_CLASSES } from '../types';
-
-interface Detection {
-  crop_path?: string;
-  defect_type?: string;
-  confidence?: number;
-}
+import { DEFECT_CLASSES, Detection } from '../types';
 
 interface ValidationControlsProps {
   onValidate: (decision: "correct" | "healthy" | "other" |"uncertain"| "next" | "back", className?: string) => void;
   detectedClass: string;   // YOLO class (for display)
-  confidence: number;      // unique identifier from backend
+  crop: string;      // unique identifier from backend
   detections?: Detection[];
 }
 
@@ -62,7 +56,7 @@ function CropStrip({
   const displayItems =
     detections && detections.length > 0
       ? detections
-      : Array(5).fill({ crop_path: "https://via.placeholder.com/64" });
+      : Array(5).fill({ crop: "https://i.pinimg.com/736x/2f/7d/69/2f7d695dd14f09ee582631cb5d08f9ea.jpg" });
 
   return (
     <div className="flex items-center space-x-2">
@@ -83,7 +77,7 @@ function CropStrip({
         {displayItems.map((det: Detection, idx: number) => (
           <img
             key={idx}
-            src={det.crop_path || "https://via.placeholder.com/64"}
+            src={det.crop || "https://via.placeholder.com/64"}
             alt={`Crop ${idx}`}
             onClick={() => {
               setCurrentIndex(idx);
@@ -108,11 +102,11 @@ function CropStrip({
   );
 }
 
-// Validation Controls
+// Validation Controls Components
 export const ValidationControls: React.FC<ValidationControlsProps> = ({ 
   onValidate, 
   detectedClass = "Unknown",
-  confidence,
+  crop,
   detections = [],
 }) => {
   const [selectedClass, setSelectedClass] = useState(DEFECT_CLASSES[0]);
@@ -122,13 +116,10 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
     className?: string
   ) => {
     try {
-      let body: any = { decision };
+      let body: any = { decision, crop };
+      if (decision === "other" && className) {body.type = className;}
 
-      if (decision === "other" && className) {
-        body.defect_type = className;
-      }
-
-      const res = await fetch(`http://localhost:8000/detections/${confidence}/validate`, {
+      const res = await fetch(`http://localhost:8000/detections/validate`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -141,22 +132,6 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
       onValidate(decision, className);
     } catch (err) {
       console.error("Error updating detection:", err);
-    }
-  };
-
-  const deleteDetection = async () => {
-    try {
-      const res = await fetch(`http://localhost:8000/detections/${confidence}`, {
-        method: "DELETE",
-      });
-
-      if (!res.ok) throw new Error("Failed to delete detection");
-      const result = await res.json();
-      console.log("Detection deleted:", result);
-
-      onValidate("healthy");
-    } catch (err) {
-      console.error("Error deleting detection:", err);
     }
   };
 
@@ -225,14 +200,6 @@ return (
         >
           <AlertTriangle size={18} />
           Other
-        </button>
-        {/* Delete */}
-        <button
-          onClick={deleteDetection}
-          className="flex items-center justify-center bg-red-500 hover:bg-red-600 text-white p-3 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
-          title="Delete Detection"
-        >
-          <Trash2 size={20} />
         </button>
 
       </div>

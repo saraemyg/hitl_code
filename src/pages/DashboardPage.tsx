@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { PieChart, Pie, BarChart, Bar, XAxis,YAxis, CartesianGrid,Tooltip,Legend,Cell,} from "recharts";
-import { Detection,DEFECT_CLASSES } from "../types";
+import { Detection, DEFECT_CLASSES } from "../types";
 
 interface DefectCount { name: string; value: number;}
 interface PieLabel { name: string; percent: number;}
@@ -42,8 +42,8 @@ const DashboardPage: React.FC = () => {
 
         data.forEach((item: any) => {
           item.detections.forEach((det: Detection) => {
-            typeCount[det.defect_type] =
-              (typeCount[det.defect_type] || 0) + 1;
+            typeCount[det.type] =
+              (typeCount[det.type] || 0) + 1;
 
             if (det.status === "validated") statusCount.validated++;
             else if (det.status === "healthy") statusCount.healthy++;

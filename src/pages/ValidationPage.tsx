@@ -5,8 +5,9 @@ import { ProgressBar } from '../components/ProgressBar';
 import InfoPanel from "../components/InfoPanel";
 import { useDetectionData } from '../hooks/useDetectionData';
 import { SkipForward, SkipBack, Filter,Layout } from 'lucide-react';
-import { Detection } from '../types';
 import AnnotationPage from "../pages/AnnotationPage";
+import { Detection } from "../types";
+import { useMetadata } from "../context/MetadataContext";
 
 export const ValidationPage: React.FC = () => {
   const {
@@ -31,7 +32,7 @@ export const ValidationPage: React.FC = () => {
 
   // Placeholder handling
   const PLACEHOLDER_IMAGE = { name: "placeholder.jpg", path: "https://i.pinimg.com/736x/d4/71/c4/d471c4befa7ec4053d9eaf8e1034b870.jpg"};
-  const PLACEHOLDER_DETECTION: Detection = { defect_id: 0, defect_type: "x", confidence: 0, bbox: [0, 0, 0, 0], status: "placeholder", crop_path: PLACEHOLDER_IMAGE.path };
+  const PLACEHOLDER_DETECTION: Detection = { id: 0, type: "x", conf: 0, bbox: [0, 0, 0, 0], status: "placeholder", crop: PLACEHOLDER_IMAGE.path };
   const isUsingPlaceholder = windowData.length === 0;
 
   // regenerate cacheBust whenever dataset or index changes
@@ -179,8 +180,8 @@ export const ValidationPage: React.FC = () => {
             <div className="row-start-3 col-start-1 col-end-5 bg-white rounded-lg shadow-lg p-6 flex flex-col justify-top">
               <ValidationControls
                 onValidate={validateDetection}
-                detectedClass={isUsingPlaceholder ? PLACEHOLDER_DETECTION.defect_type : (currentDetection?.defect_type ?? "Unknown")}
-                confidence={isUsingPlaceholder ? 0 : Number(currentDetection?.confidence ?? 0)}
+                detectedClass={isUsingPlaceholder ? PLACEHOLDER_DETECTION.type : (currentDetection?.type ?? "Unknown")}
+                crop={isUsingPlaceholder ? PLACEHOLDER_DETECTION.crop : (currentDetection?.crop ?? "")} // use crop here
                 detections={isUsingPlaceholder ? [PLACEHOLDER_DETECTION] : (currentImage?.detections ?? [])}
               />
             </div>

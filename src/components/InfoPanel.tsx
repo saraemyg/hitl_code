@@ -28,13 +28,13 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
     
     // Count by defect type
     const byType = detections.reduce((acc: Record<string, number>, d: Detection) => {
-      acc[d.defect_type] = (acc[d.defect_type] || 0) + 1;
+      acc[d.type] = (acc[d.type] || 0) + 1;
       return acc;
     }, {});
 
     // Count by validation status
     const byStatus = detections.reduce((acc: Record<string, number>, d: Detection) => {
-      if (d.defect_type === "healthy") {
+      if (d.type === "healthy") {
         acc.healthy = (acc.healthy || 0) + 1;
       } else if (d.status === "validated") {
         acc.validated = (acc.validated || 0) + 1;
@@ -62,12 +62,12 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         <div className="space-y-3">
           <div className="flex justify-between">
             <span className="text-gray-600">Class:</span>
-            <span className="font-semibold">{currentDetection.defect_type}</span>
+            <span className="font-semibold">{currentDetection.type}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Confidence:</span>
             <span className="font-semibold">
-              {(currentDetection.confidence / 1e10 * 100).toFixed(2)}%
+              {(currentDetection.conf * 100).toFixed(2)}%
             </span>
           </div>
           <div className="flex justify-between">
@@ -78,7 +78,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Detection ID:</span>
-            <span className="font-mono text-sm">{currentDetection.defect_id}</span>
+            <span className="font-mono text-sm">{currentDetection.id}</span>
           </div>
         </div>
       </div>
