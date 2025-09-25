@@ -10,30 +10,50 @@ const SummaryPage: React.FC = () => {
   const [pageIndex, setPageIndex] = useState<Record<string, number>>({});
   const [showConfidence, setShowConfidence] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false); 
+  const [source, setSource] = useState<string>(""); // <-- track backend source
 
-  useEffect(() => {
-    fetch("http://localhost:8000/metadata")
-      .then((res) => res.json())
-      .then((data) => {
-        const groups: Record<string, { src: string; confidence: number }[]> = {};
+useEffect(() => {
+  let cancelled = false;
 
-        data.forEach((item: any) => {
-          item.detections.forEach((det: Detection) => {
-            const type = det.type.replace(/\s+/g, "");
-            if (!groups[type]) groups[type] = [];
-            if (det.crop) {
-              groups[type].push({
-                src: "/" + det.crop.replace(/\\/g, "/"),
-                confidence: det.conf,
-              });
-            }
-          });
-        });
+  const fetchMetadata = async () => {
+    try {
+      const cached = localStorage.getItem("metadata"); // Check cache first
+      if (cached) {
+        setGroupedCrops(JSON.parse(cached));
+      }
 
-        setGroupedCrops(groups);
-      })
-      .catch((err) => console.error("Failed to fetch metadata", err));
-  }, []);
+      const res = await fetch("http://localhost:8000/metadata");
+      if (!res.ok) throw new Error(`Failed with ${res.status}`);
+      const data = await res.json();
+      if (cancelled) return;
+
+      const groups: Record<string, { src: string; confidence: number }[]> = {};
+      for (const item of data) {
+        for (const det of item.detections) {
+          const type = det.type.replace(/\s+/g, "");
+          if (!groups[type]) groups[type] = [];
+
+          if (det.crop) {
+            groups[type].push({
+              src: `http://localhost:8000/data/${det.crop.replace(/\\/g, "/")}`,
+              confidence: det.conf,
+            });
+          }
+        }
+      }
+
+      setGroupedCrops(groups);
+      localStorage.setItem("metadata", JSON.stringify(groups));
+    } catch (err) {
+      console.error("Failed to fetch metadata", err);
+    }
+  };
+
+  fetchMetadata();
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   // Sort DEFECT_CLASSES by count in groupedCrops
   const sortedClasses = useMemo(() => {
@@ -143,6 +163,7 @@ const SummaryPage: React.FC = () => {
                         className="bg-gray-100 rounded flex items-center justify-center overflow-hidden aspect-square relative"
                       >
                         <img
+                          loading="lazy"
                           src={img.src}
                           alt={`${cls} crop`}
                           className="object-cover w-full h-full"

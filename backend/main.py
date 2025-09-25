@@ -3,9 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from pymongo import MongoClient
+from pymongo import MongoClient, errors
 from dotenv import load_dotenv
 from pathlib import Path
+from urllib.parse import urlparse, unquote
 
 import shutil
 import tempfile
@@ -29,11 +30,12 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = os.getenv("DB_NAME", "hitl_db")
+COLLECTION_NAME = "images"
 
 # MongoDB Connection 
-client = MongoClient(MONGO_URI)
+client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
 db = client[DB_NAME]
-images = db["images"]
+images = db[COLLECTION_NAME]
 
 # * optimise this later for multiple model selection
 detector = PlantDefectDetector("models/HQx1280.pt")
@@ -79,53 +81,97 @@ default_metadata_file = os.path.join(VERSION_DIR, f"{DETECTION_VERSION}_metadata
 
 @app.get("/metadata")
 async def get_metadata(file: str = Query(default=default_metadata_file, description="Metadata file path")):
+    """Fetch metadata from MongoDB if available, else JSON fallback"""
+    try:
+        client.admin.command("ping")  # test Mongo
+        print("✅ [Mongo] Fetching metadata from Atlas")
+        docs = list(images.find({}, {"_id": 0}))
+        return JSONResponse(content=docs)
+    except errors.PyMongoError as e:
+        print(f"⚠️ [Mongo Error] {e}, falling back to JSON")
+
+    # JSON fallback
     if os.path.exists(file):
         try:
             with open(file, "r") as f:
                 metadata = json.load(f)
+            print(f"💾 [JSON] Loaded metadata from {file}")
             return JSONResponse(content=metadata)
         except json.JSONDecodeError:
+            print(f"❌ [JSON] Invalid JSON format in {file}")
             return JSONResponse(content={"error": f"Invalid JSON format in {file}"}, status_code=500)
+    print(f"❌ [JSON] Metadata file '{file}' not found")
     return JSONResponse(content={"error": f"Metadata file '{file}' not found"}, status_code=404)
+
 
 @app.get("/metadata/files")
 async def list_metadata_files():
-    """List all available metadata JSON files under data/"""
-    if not os.path.exists(DATA_ROOT):
-        return JSONResponse(content={"files": []})
+    """
+    List available metadata sources.
+    If Mongo is up, return 'MongoDB Atlas'.
+    Always list JSON files under data/ as fallback.
+    """
+    sources = []
 
-    files = []
-    # Walk through each detection version folder
-    for root, _, filenames in os.walk(DATA_ROOT):
-        for f in filenames:
-            if f.endswith("_metadata.json"):
-                # return relative path (e.g. detection_v1/detection_v1_metadata.json)
-                rel_path = os.path.relpath(os.path.join(root, f), DATA_ROOT)
-                files.append(rel_path.replace("\\", "/"))
+    # Check Mongo
+    try:
+        client.admin.command("ping")
+        print("✅ [Mongo] Atlas available")
+        sources.append("MongoDB Atlas")
+    except errors.PyMongoError as e:
+        print(f"⚠️ [Mongo Error] {e}, MongoDB unavailable")
 
-    return JSONResponse(content={"files": files})
+    # JSON files fallback
+    if os.path.exists(DATA_ROOT):
+        for root, _, filenames in os.walk(DATA_ROOT):
+            for f in filenames:
+                if f.endswith("_metadata.json"):
+                    rel_path = os.path.relpath(os.path.join(root, f), DATA_ROOT)
+                    sources.append(rel_path.replace("\\", "/"))
+
+    print("📂 Available metadata sources:", sources)
+    return JSONResponse(content={"files": sources})
+
     
 # Helper Functions -------------------------------------------------
 def load_metadata(file: str = default_metadata_file):
-    if not os.path.exists(file):
-        return []
-    with open(file, "r") as f:
-        metadata = json.load(f)
+    try:
+        client.admin.command("ping")  # check Mongo connection
+        print("✅ Using MongoDB for metadata")
+        return list(images.find({}, {"_id": 0}))  # strip ObjectId
+    except errors.PyMongoError:
+        print("⚠️ Mongo unavailable, falling back to JSON")
+        if not os.path.exists(file):
+            return []
+        with open(file, "r") as f:
+            metadata = json.load(f)
 
-    # Clean metadata: only keep detections where crop file exists
-    cleaned_metadata = []
-    for item in metadata:
-        valid_detections = []
-        for det in item.get("detections", []):
-            crop_path = det.get("crop")
-            if crop_path and os.path.exists(crop_path.replace("\\", "/")):
-                valid_detections.append(det)
-        item["detections"] = valid_detections
-        cleaned_metadata.append(item)
-    return cleaned_metadata
+        cleaned_metadata = []
+        for item in metadata:
+            valid_detections = []
+            for det in item.get("detections", []):
+                crop_path = det.get("crop")
+                if crop_path:
+                    fs_path = os.path.join("data", crop_path.replace("\\", "/"))
+                    if os.path.exists(fs_path):
+                        valid_detections.append(det)
+            item["detections"] = valid_detections
+            cleaned_metadata.append(item)
+        return cleaned_metadata
+
 
 def save_metadata(results: list, metadata_file: str = default_metadata_file):
-    # Strip "data/" prefix if present before saving
+    try:
+        client.admin.command("ping")
+        print("✅ Saving to MongoDB")
+        images.delete_many({})  # overwrite everything (same as JSON rewrite)
+        if results:
+            images.insert_many(results)
+        return
+    except errors.PyMongoError:
+        print("⚠️ Mongo unavailable, saving to JSON fallback")
+
+    # JSON fallback
     for entry in results:
         if entry.get("uploaded_img", "").startswith("data/"):
             entry["uploaded_img"] = entry["uploaded_img"].replace("data/", "", 1)
@@ -138,13 +184,28 @@ def save_metadata(results: list, metadata_file: str = default_metadata_file):
 
     with open(metadata_file, "w") as f:
         json.dump(results, f, indent=2)
+    print("💾 Saved metadata to JSON fallback")
+
+# delete function add here / delete detections or delete image
 
 # Validation Process ------------------------------------------
+
 @app.patch("/detections/validate")
 async def validate_detection(body: dict = Body(...)):
+    print("=== Incoming validate request ===")
+    print("Body:", body)
+
     crop = body.get("crop")
     if not crop:
         raise HTTPException(status_code=400, detail="Crop not provided")
+
+    # Normalize crop path
+    parsed = urlparse(crop)
+    req_path = unquote(parsed.path).lstrip("/")
+    if req_path.startswith("data/"):
+        req_path = req_path[len("data/"):]
+    print("Normalized request crop:", req_path)
+
     decision = body.get("decision")
     status_map = {
         "correct": "validated",
@@ -152,21 +213,49 @@ async def validate_detection(body: dict = Body(...)):
         "other": "validated",
         "uncertain": "uncertain"
     }
+    update = {"status": status_map.get(decision, "unvalidated")}
+    if decision == "other" and "type" in body:
+        update["type"] = body["type"]
 
+    # Try Mongo first
+    try:
+        client.admin.command("ping")
+        print("✅ Using MongoDB for validation")
+
+        result = images.update_one(
+            {"detections.crop": req_path},
+            {"$set": {f"detections.$.{k}": v for k, v in update.items()}}
+        )
+
+        if result.modified_count > 0:
+            updated_doc = images.find_one({"detections.crop": req_path}, {"_id": 0})
+            print("✅ Updated detection in Mongo")
+            return {"updated": updated_doc}
+        else:
+            print("No match found in Mongo for:", req_path)
+
+    except errors.PyMongoError as e:
+        print("⚠️ MongoDB error:", e)
+
+    # JSON fallback
+    print("⚠️ Falling back to JSON patch")
     metadata = load_metadata()
-    req_filename = Path(crop).name
+    print("Loaded metadata items:", len(metadata))
 
     for item in metadata:
         for det in item.get("detections", []):
-            det_crop_filename = Path(det.get("crop_path") or det.get("crop") or "").name
-            if det_crop_filename == req_filename:
-                if decision in status_map:
-                    det["status"] = status_map[decision]
-                if decision == "other" and "type" in body:
-                    det["type"] = body["type"]
+            det_crop = det.get("crop") or ""
+            print(f"Comparing request [{req_path}] with stored [{det_crop}]")
+
+            if det_crop == req_path:
+                print("✅ Match found! Updating detection (JSON)...")
+                det.update(update)
                 save_metadata(metadata)
+                print("Detection updated and metadata saved to JSON")
                 return {"updated": det}
-    raise HTTPException(status_code=404, detail="Detection not found")
+
+    print("No match found for:", req_path)
+    raise HTTPException(status_code=404, detail=f"Detection not found for {req_path}")
 
 # Detection Pipeline --------------------------------------------
 

@@ -126,7 +126,7 @@ export const ValidationPage: React.FC = () => {
                   disabled
                   className="cursor-default bg-gray-100 text-gray-400 text-sm font-medium px-3 py-1 rounded shadow-sm"
                 >
-                  {`${currentImageIndex + 1} / ${getImageCount()} — ${currentImage?.uploaded_img}`}
+                  {`${currentImageIndex + 1} / ${getImageCount()} — ${currentImage?.uploaded_img?.split("/").pop()}`}
                 </button>
                 <button
                   onClick={() => setShowAltView(!showAltView)}
