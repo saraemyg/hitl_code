@@ -196,13 +196,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           >
             Upload Image
           </button>
-          <button
+          {/* <button
             className="ml-1 p-2 bg-red-100 rounded hover:bg-red-200"
             onClick={() => clearFolder("uploaded")}
             title="Clear uploaded images"
           >
             <Trash2 size={16} className="text-red-600" />
-          </button>
+          </button> */}
         </div>
         <input
           type="file"
@@ -233,13 +233,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           >
             Run Detection
           </button>
-          <button
+          {/* <button
             className="p-2 bg-red-100 rounded hover:bg-red-200"
             onClick={() => clearFolder("processed")}
             title="Clear processed images"
           >
             <Trash2 size={16} className="text-red-600" />
-          </button>
+          </button> */}
         </div>
 
         {/* Convert */}
@@ -250,13 +250,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           >
             Convert to YOLOv11 Format
           </button>
-          <button
+          {/* <button
             className="ml-1 p-2 bg-red-100 rounded hover:bg-red-200"
             onClick={() => clearFolder("converted")}
             title="Clear converted files"
           >
             <Trash2 size={16} className="text-red-600" />
-          </button>
+          </button> */}
         </div>
 
         {/* Download */}

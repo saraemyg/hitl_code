@@ -19,8 +19,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
         byStatus: {
           validated: 0,
           unvalidated: 0,
-          healthy: 0
-        }
+          healthy: 0,
+          uncertain: 0,
+        },
       };
     }
 
@@ -32,22 +33,27 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
       return acc;
     }, {});
 
-    // Count by validation status
-    const byStatus = detections.reduce((acc: Record<string, number>, d: Detection) => {
-      if (d.type === "healthy") {
-        acc.healthy = (acc.healthy || 0) + 1;
-      } else if (d.status === "validated") {
-        acc.validated = (acc.validated || 0) + 1;
-      } else {
-        acc.unvalidated = (acc.unvalidated || 0) + 1;
-      }
-      return acc;
-    }, { validated: 0, unvalidated: 0, healthy: 0 });
+    // Count by status
+    const byStatus = detections.reduce(
+      (acc: Record<string, number>, d: Detection) => {
+        if (d.status === "healthy") {
+          acc.healthy++;
+        } else if (d.status === "validated") {
+          acc.validated++;
+        } else if (d.status === "uncertain") {
+          acc.uncertain++;
+        } else {
+          acc.unvalidated++;
+        }
+        return acc;
+      },
+      { validated: 0, unvalidated: 0, healthy: 0, uncertain: 0 }
+    );
 
     return {
       total: detections.length,
       byType,
-      byStatus
+      byStatus,
     };
   }, [currentImage]);
 
@@ -70,15 +76,11 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               {(currentDetection.conf * 100).toFixed(2)}%
             </span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex flex-col">
             <span className="text-gray-600">Bounding Box:</span>
-            <span className="font-mono text-sm">
+            <span className="font-mono text-gray-400 text-sm break-all">
               [{currentDetection.bbox.map((n: number) => n.toFixed(0)).join(", ")}]
             </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Detection ID:</span>
-            <span className="font-mono text-sm">{currentDetection.id}</span>
           </div>
         </div>
       </div>
@@ -102,11 +104,15 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">⚠ Unvalidated:</span>
-                <span className="text-yellow-600 font-semibold">{stats.byStatus.unvalidated}</span>
+                <span className="text-gray-600 font-semibold">{stats.byStatus.unvalidated}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">❤ Healthy:</span>
                 <span className="text-blue-600 font-semibold">{stats.byStatus.healthy}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">❓ Uncertain:</span>
+                <span className="text-yellow-600 font-semibold">{stats.byStatus.uncertain}</span>
               </div>
             </div>
           </div>

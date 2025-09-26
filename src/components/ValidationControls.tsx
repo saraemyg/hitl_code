@@ -1,123 +1,46 @@
-import React, { useState, useRef } from 'react';
-import { Check, X, AlertTriangle, Trash2, Album, ChevronLeft, ChevronRight} from 'lucide-react';
-import { DEFECT_CLASSES, Detection } from '../types';
+// src/components/ValidationControls.tsx
+import React, { useState } from "react";
+import { Check, AlertTriangle, Heart, HelpCircle, Trash2Icon} from "lucide-react";
+import { DEFECT_CLASSES, Detection } from "../types";
+import ConfirmModal from "../components/ConfirmModal";
 
-interface ValidationControlsProps {
-  onValidate: (decision: "correct" | "healthy" | "other" |"uncertain"| "next" | "back", className?: string) => void;
-  detectedClass: string;   // YOLO class (for display)
-  crop: string;      // unique identifier from backend
-  detections?: Detection[];
+export interface ValidationControlsProps {
+  onValidate: (
+    decision: "correct" | "healthy" | "other" | "uncertain",
+    type?: string // optional, only when decision === "other"
+  ) => void;
+  currentDetection: Detection; // keep: so this component knows what to display
+  goNextDetection: () => void; // keep: in case parent wants to handle navigation externally
+  onDelete?: (crop: string) => void;
 }
 
-// CropStrip Sub-component 
-function CropStrip({
-  detections = [],
-  onSelect,
-}: {
-  detections?: Detection[];
-  onSelect: (det: Detection) => void;
-}) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const handlePrev = () => {
-    if (currentIndex > 0) {
-      const newIndex = currentIndex - 1;
-      setCurrentIndex(newIndex);
-      onSelect(detections[newIndex]);
-      scrollToIndex(newIndex);
-    }
-  };
-
-  const handleNext = () => {
-    if (detections && currentIndex < detections.length - 1) {
-      const newIndex = currentIndex + 1;
-      setCurrentIndex(newIndex);
-      onSelect(detections[newIndex]);
-      scrollToIndex(newIndex);
-    }
-  };
-
-  const scrollToIndex = (index: number) => {
-    const container = scrollRef.current;
-    if (container) {
-      const child = container.children[index] as HTMLElement;
-      if (child) {
-        container.scrollTo({
-          left:
-            child.offsetLeft - container.clientWidth / 2 + child.clientWidth / 2,
-          behavior: "smooth",
-        });
-      }
-    }
-  };
-
-  // Show real detections if available, otherwise show 5 placeholders
-  const displayItems =
-    detections && detections.length > 0
-      ? detections
-      : Array(5).fill({ crop: "https://i.pinimg.com/736x/2f/7d/69/2f7d695dd14f09ee582631cb5d08f9ea.jpg" });
-
-  return (
-    <div className="flex items-center space-x-2">
-      {/* Prev button */}
-      <button
-        onClick={handlePrev}
-        disabled={currentIndex === 0}
-        className="p-2 bg-gray-200 rounded-lg disabled:opacity-50"
-      >
-        <ChevronLeft size={18} />
-      </button>
-
-      {/* Crops scroll strip */}
-      <div
-        ref={scrollRef}
-        className="flex overflow-x-auto space-x-2 w-full max-w-3xl scrollbar-hide"
-      >
-        {displayItems.map((det: Detection, idx: number) => (
-          <img
-            key={idx}
-            src={det.crop || "https://via.placeholder.com/64"}
-            alt={`Crop ${idx}`}
-            onClick={() => {
-              setCurrentIndex(idx);
-              onSelect(det);
-            }}
-            className={`w-20 h-20 object-cover rounded-lg cursor-pointer border-2 ${
-              idx === currentIndex ? "border-blue-500" : "border-transparent"
-            }`}
-          />
-        ))}
-      </div>
-
-      {/* Next button */}
-      <button
-        onClick={handleNext}
-        disabled={detections && currentIndex === detections.length - 1}
-        className="p-2 bg-gray-200 rounded-lg disabled:opacity-50"
-      >
-        <ChevronRight size={18} />
-      </button>
-    </div>
-  );
-}
-
-// Validation Controls Components
-export const ValidationControls: React.FC<ValidationControlsProps> = ({ 
-  onValidate, 
-  detectedClass = "Unknown",
-  crop,
-  detections = [],
+export const ValidationControls: React.FC<ValidationControlsProps> = ({
+  onValidate,
+  currentDetection,
+  onDelete,
 }) => {
   const [selectedClass, setSelectedClass] = useState(DEFECT_CLASSES[0]);
-  
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // validate detection + auto-advance
   const validateDetection = async (
-    decision: "correct" | "healthy" | "other" | "uncertain" ,
-    className?: string
+    decision: "correct" | "healthy" | "other" | "uncertain",
+    type?: string
   ) => {
+    if (!currentDetection) return;
+
     try {
-      let body: any = { decision, crop };
-      if (decision === "other" && className) {body.type = className;}
+      let body: any = {
+        crop: currentDetection.crop,            
+        decision,
+      };
+
+      if (decision === "other" && type) {
+        body.type = type;
+      } else {
+        body.type = currentDetection.type;       
+      }
 
       const res = await fetch(`http://localhost:8000/detections/validate`, {
         method: "PATCH",
@@ -129,82 +52,180 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
       const updated = await res.json();
       console.log("Detection updated:", updated);
 
-      onValidate(decision, className);
+      onValidate(decision, body.type);
     } catch (err) {
       console.error("Error updating detection:", err);
     }
   };
 
-return (
-  <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
+  // Delete handling 
+  const handleDeleteConfirmed = async () => {
+    if (!currentDetection) return;
+    setIsDeleting(true);
 
-    {/* Crop strip on top */}
-      <CropStrip
-        detections={detections}
-        onSelect={(det) => console.log("Selected detection:", det)}
-      />
+    try {
+      const body = { crop: currentDetection.crop };
+      console.log("Deleting detection (frontend) for crop:", body.crop);
 
-    {/* Header */}
-    <div className="flex items-center justify-between">
-      <h3 className="text-lg font-semibold text-gray-800">
-        Detected: {detectedClass}
-      </h3>
-      <p className="text-gray-600 text-left">Please validate this detection:</p>
-    </div>
-    
-    {/* Validation + Other/Delete buttons in one row */}
-    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+      const res = await fetch(`http://localhost:8000/detections/delete`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-      {/* Correct */}
-      <button
-        onClick={() => validateDetection("correct", detectedClass)}
-        className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
-      >
-        <Check size={20} />
-        Correct
-      </button>
+      if (!res.ok) {
+        // attempt to parse error message
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.detail || res.statusText || "Delete failed");
+      }
 
-      {/* Healthy */}
-      <button
-        onClick={() => validateDetection("healthy", detectedClass)}
-        className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
-      >
-        <X size={20} />
-        Healthy
-      </button>
+      const result = await res.json();
+      console.log("✅ Delete result:", result);
 
-      <div className="flex gap-2 col-span-3">
-        {/* Uncertain */}
-        <button
-          onClick={() => validateDetection("uncertain", detectedClass)}
-          className="flex items-center justify-center bg-red-500 hover:bg-red-600 text-white p-3 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
-          title="Uncertain Detection"
-        >
-          <Album size={20} />
-        </button>
-        {/* Other */}
-        <select
-          value={selectedClass}
-          onChange={(e) => setSelectedClass(e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
-        >
-          {DEFECT_CLASSES.map(className => (
-            <option key={className} value={className}>
-              {className}
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={() => validateDetection("other", selectedClass)}
-          className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg"
-        >
-          <AlertTriangle size={18} />
-          Other
-        </button>
+      // notify parent so the page can reload metadata / advance
+      onDelete?.(currentDetection.crop || "");
 
+      // close modal
+      setShowDeleteModal(false);
+
+      // // optionally advance UI if parent didn't
+      // goNextDetection?.();
+    } catch (err) {
+      console.error("Error deleting detection:", err);
+      // optional: show user feedback
+      alert("Failed to delete detection: " + (err as Error).message);
+      setShowDeleteModal(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!currentDetection) return;
+
+      const key = e.key.toLowerCase();
+      switch (key) {
+        case "s":
+          validateDetection("correct", currentDetection.type);
+          break;
+        case "q":
+          validateDetection("uncertain", currentDetection.type);
+          break;
+        case "w":
+          validateDetection("healthy", currentDetection.type);
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentDetection]); // re-run effect when currentDetection changes
+
+
+  return (
+    <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
+      {/* Header with info tooltip */}
+      <div className="flex items-center justify-between relative">
+        <p className="text-gray-600 text-right">Please validate this detection.</p>
+        {/* Info button */}
+        <div className="relative group ml-2">
+          <button
+            className="w-6 h-6 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-sm font-bold"
+            type="button"
+          >
+            i
+          </button>
+
+          {/* Tooltip */}
+          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
+            Keyboard Shortcuts: <br />
+            A: Prev Detection <br />
+            D: Next Detection <br />
+            S: Correct <br />
+            W: Healthy <br />
+            Q: Uncertain <br />
+            Space: Next Image
+          </div>
+        </div>
       </div>
+
+      {/* Validation buttons */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+        {/* Correct */}
+        <button
+          onClick={() => validateDetection("correct", currentDetection?.type)}
+          className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
+        >
+          <Check size={20} />
+          Correct
+        </button>
+
+        {/* Healthy */}
+        <button
+          onClick={() => validateDetection("healthy", currentDetection?.type)}
+          className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors duration-200 shadow-md hover:shadow-lg"
+        >
+          <Heart size={20} />
+          Healthy
+        </button>
+
+        <div className="flex gap-2 col-span-3">
+          {/* Uncertain */}
+          <button
+            onClick={() => validateDetection("uncertain", currentDetection?.type)}
+            className="flex items-center justify-center bg-yellow-500 hover:bg-red-600 text-white p-3 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
+            title="Uncertain Detection"
+          >
+            <HelpCircle size={20} />
+          </button>
+
+          {/* Other */}
+          <button
+            onClick={() => validateDetection("other", selectedClass)}
+            className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg"
+          >
+            <AlertTriangle size={18} />
+            Other
+          </button>
+          <select
+            value={selectedClass}
+            onChange={(e) => setSelectedClass(e.target.value)}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm"
+          >
+            {DEFECT_CLASSES.map((cls) => (
+              <option key={cls} value={cls}>
+                {cls}
+              </option>
+            ))}
+          </select>
+
+          {/* Delete button */}
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="flex items-center justify-center bg-red-500 hover:bg-red-600 text-white p-3 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
+            title="Delete Detection"
+            disabled={!currentDetection}
+          >
+            <Trash2Icon size={20} />
+          </button>
+
+          {/* Comfrimation Modal */}
+           <ConfirmModal
+            open={showDeleteModal}
+            title="Delete detection?"
+            message={`Delete detection "${currentDetection?.type}"? This cannot be undone.`}
+            confirmText={isDeleting ? "Deleting..." : "Delete"}
+            cancelText="Cancel"
+            onConfirm={handleDeleteConfirmed}
+            onCancel={() => setShowDeleteModal(false)}
+          />
+          
+        </div>
+      </div>
+
     </div>
-  </div>
   );
 };
 

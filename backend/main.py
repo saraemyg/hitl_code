@@ -257,6 +257,63 @@ async def validate_detection(body: dict = Body(...)):
     print("No match found for:", req_path)
     raise HTTPException(status_code=404, detail=f"Detection not found for {req_path}")
 
+# Delete Detection
+@app.delete("/detections/delete")
+async def delete_detection(body: dict = Body(...)):
+    print("=== Incoming delete request ===")
+    print("Body:", body)
+
+    crop = body.get("crop")
+    if not crop:
+        raise HTTPException(status_code=400, detail="Crop not provided")
+
+    # Normalize crop path
+    parsed = urlparse(crop)
+    req_path = unquote(parsed.path).lstrip("/")
+    if req_path.startswith("data/"):
+        req_path = req_path[len("data/"):]
+    print("Normalized request crop:", req_path)
+
+    # Try Mongo first
+    try:
+        client.admin.command("ping")
+        print("✅ Using MongoDB for delete")
+
+        result = images.update_one(
+            {"detections.crop": req_path},
+            {"$pull": {"detections": {"crop": req_path}}}
+        )
+
+        if result.modified_count > 0:
+            updated_doc = images.find_one({"detections.crop": {"$ne": req_path}}, {"_id": 0})
+            print("✅ Deleted detection in Mongo")
+            return {"deleted": req_path}
+        else:
+            print("No match found in Mongo for:", req_path)
+
+    except errors.PyMongoError as e:
+        print("⚠️ MongoDB error:", e)
+
+    # JSON fallback
+    print("⚠️ Falling back to JSON delete")
+    metadata = load_metadata()
+    print("Loaded metadata items:", len(metadata))
+    for item in metadata:
+        detections = item.get("detections", [])
+        for det in detections:
+            det_crop = det.get("crop") or ""
+            print(f"Comparing request [{req_path}] with stored [{det_crop}]")
+            if det_crop == req_path:
+                print("✅ Match found! Removing detection (JSON)...")
+                # remove this detection object from the list
+                item["detections"] = [d for d in detections if (d.get("crop") or "") != req_path]
+                save_metadata(metadata)
+                print("Detection removed and metadata saved to JSON")
+                return {"deleted": req_path}
+
+    print("No match found for:", req_path)
+    raise HTTPException(status_code=404, detail=f"Detection not found for {req_path}")
+
 # Detection Pipeline --------------------------------------------
 
 @app.post("/bulk-detect")
@@ -354,7 +411,7 @@ async def upload_images(files: List[UploadFile] = File(...)):
 # async def convert_yolov11():
 #     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 #     output_dir = os.path.join("yolov11",f"yolov11_format{timestamp}")
-#     result = convert_to_yolov11(metadata_path, output_dir)
+#     # result = convert_to_yolov11(metadata_path, output_dir)
 #     return {
 #         "status": "success",
 #         "output_dir": output_dir,

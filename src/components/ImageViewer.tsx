@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Detection } from '../types';
 
+// handle bbox handling here 
 interface ImageViewerProps {
   imageSrc: string;
   detection?: Detection; 

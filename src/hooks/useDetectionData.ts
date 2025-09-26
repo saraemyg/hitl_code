@@ -1,34 +1,28 @@
 import { useState, useEffect, useRef } from "react";
 import { ImageData } from "../types";
-import { useMetadata } from "../context/MetadataContext"; // ⬅️ Import context to access selectedMetadata
+import { useMetadata } from "../context/MetadataContext"; 
 
 const API_BASE = "http://localhost:8000";
 
 // Utility function to fetch metadata
 export const fetchDetectionMetadata = async (
   selectedMetadata?: string // Now optional, we’ll decide fallback inside
-): Promise<ImageData[]> => {
-  // if user picked from dropdown, use it; else default to detection_v1
-  const metadataFile = selectedMetadata
-    ? `data/${selectedMetadata}`
-    : "data/detection_v1/detection_v1_metadata.json";
+  ): Promise<ImageData[]> => { // if user picked from dropdown, use it; else default to detection_v1
+    const metadataFile = selectedMetadata
+      ? `data/${selectedMetadata}`
+      : "data/detection_v1/detection_v1_metadata.json";
 
-  let response: Response;
+    let response: Response;
 
-  try {
-    response = await fetch(`${API_BASE}/metadata?file=${metadataFile}&t=${Date.now()}`);
-    if (!response.ok) throw new Error("Fetch failed");
-  } catch (err) {
-    console.warn(
-      `⚠️ Failed to load ${metadataFile}, falling back to detection_v1`,
-      err
-    );
-    // fallback to detection_v1
-    response = await fetch(
-      `${API_BASE}/metadata?file=data/detection_v1/detection_v1_metadata.json&t=${Date.now()}`
-    );
-    if (!response.ok) throw new Error("Failed to fetch detection_v1 metadata");
-  }
+    try {
+      response = await fetch(`${API_BASE}/metadata?file=${metadataFile}&t=${Date.now()}`);
+      if (!response.ok) throw new Error("Fetch failed");
+    } catch (err) {
+      console.warn( `⚠️ Failed to load ${metadataFile}, falling back to detection_v1`,err);
+      // fallback to detection_v1
+      response = await fetch(`${API_BASE}/metadata?file=data/detection_v1/detection_v1_metadata.json&t=${Date.now()}`);
+      if (!response.ok) throw new Error("Failed to fetch detection_v1 metadata");
+    }
 
   const metadata = await response.json();
 
@@ -50,30 +44,32 @@ export const fetchDetectionMetadata = async (
 };
 
 // Filter type
-export type FilterStatus = "all" | "validated" | "unvalidated";
+export type FilterStatus = "all" | "validated" | "unvalidated" | "uncertain" | "healthy";
+
+// Hook -------------------------------------------------------
 
 export const useDetectionData = () => {
   const { selectedMetadata } = useMetadata(); 
-  // ⬅️ We now consume selectedMetadata directly from context.
-  // No more passing it as an argument.
 
-  // Store raw metadata outside state
+  // Store raw metadata outside state to avoid unnecessary re-renders
   const metadataRef = useRef<ImageData[]>([]);
 
   // Navigation state
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [currentDetectionIndex, setCurrentDetectionIndex] = useState(0);
 
-  // Small "window" of data in state for performance
+  // Small "window" of data in state for performance UI efficiency
   const [windowData, setWindowData] = useState<ImageData[]>([]);
 
   // Track validation results
   const [validationResults, setValidationResults] = useState<any[]>([]);
 
-  // Filtering control
+  // Filter control (used only for UI)
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
 
-  // --- Filter helper
+  // Helpers -----------------------------------------------------
+
+  // Filter helper get filtered metadata for UI (thumbnails, progress)
   const getFilteredMetadata = () => {
     return metadataRef.current.filter((img) => {
       if (filterStatus === "all") return true;
@@ -85,32 +81,7 @@ export const useDetectionData = () => {
     });
   };
 
-  // --- Load metadata (adjusted)
-  const reloadMetadata = async () => {
-    // ⬇️ Use selectedMetadata from context
-    metadataRef.current = await fetchDetectionMetadata(selectedMetadata);
-
-    // Pick the first image with detections
-    const firstIdx = metadataRef.current.findIndex(
-      (img) => img.detections.length > 0
-    );
-    const startIdx = firstIdx === -1 ? 0 : firstIdx;
-
-    setCurrentImageIndex(startIdx);
-    setCurrentDetectionIndex(0);
-
-    updateWindow(startIdx);
-  };
-
-  // --- Load when selectedMetadata changes (adjusted)
-  useEffect(() => {
-    if (selectedMetadata) {
-      reloadMetadata();
-    }
-  }, [selectedMetadata]); 
-  // ⬅️ Dependency: reload when dropdown/context changes
-
-  // --- Sliding Window Management
+  // --- Sliding window for performance
   const updateWindow = (imgIndex: number) => {
     const windowSize = 5;
     const start = Math.max(0, imgIndex - 2);
@@ -118,88 +89,72 @@ export const useDetectionData = () => {
     setWindowData(metadataRef.current.slice(start, end));
   };
 
-  // --- Current Accessors
+  // Accessors using full metadata (prevents jumping on validation)
+  const getCurrentDetection = () => getCurrentImage()?.detections[currentDetectionIndex];
+  const getCurrentCropPath = () => getCurrentDetection()?.crop ?? null;
   const getCurrentImage = () => {
     const filteredData = getFilteredMetadata();
     return filteredData[currentImageIndex];
   };
-  const getCurrentDetection = () => getCurrentImage()?.detections[currentDetectionIndex];
-  const getCurrentCropPath = () => getCurrentDetection()?.crop ?? null;
 
-  // --- Validation
-  const validateDetection = (
-    decision: "correct" | "healthy" | "other",
-    className?: string
-  ) => {
-    const currentImage = getCurrentImage();
-    const currentDetection = getCurrentDetection();
-    if (!currentDetection) return;
+  // Metadata ------------------------------------------------
+  // Pure reload (does NOT reset user navigation)
+  const reloadMetadata = async () => {
+    const newMetadata = await fetchDetectionMetadata(selectedMetadata);
+    metadataRef.current = newMetadata;
 
-    currentDetection.validated = true;
-    currentDetection.validatedAs = decision === "other" ? className : decision;
+    // Keep current indexes valid after reload
+    const clampedImageIndex = Math.min(currentImageIndex, newMetadata.length - 1);
+    setCurrentImageIndex(clampedImageIndex);
 
-    setValidationResults((prev) => [
-      ...prev,
-      {
-        detectionId: currentDetection.id,
-        decision,
-        className: decision === "other" ? className : undefined,
-      },
-    ]);
+    const clampedDetectionIndex = Math.min(
+      currentDetectionIndex,
+      newMetadata[clampedImageIndex]?.detections.length - 1 || 0
+    );
+    setCurrentDetectionIndex(clampedDetectionIndex);
 
-    moveToNext();
+    updateWindow(clampedImageIndex);
   };
 
-  // --- Navigation helpers
-  const findNextImageWithDetections = (start: number) => {
-    const filteredData = getFilteredMetadata();
-    let i = start + 1;
-    while (i < filteredData.length && filteredData[i].detections.length === 0) i++;
-    return i < filteredData.length ? i : -1;
-  };
+  // Auto reload on metadata change
+  useEffect(() => {
+    if (selectedMetadata) reloadMetadata();
+  }, [selectedMetadata]);
 
-  const findPrevImageWithDetections = (start: number) => {
-    const filteredData = getFilteredMetadata();
-    let i = start - 1;
-    while (i >= 0 && filteredData[i].detections.length === 0) i--;
-    return i >= 0 ? i : -1;
-  };
-
-  // --- Detection-first navigation
-  const moveToNext = () => {
+  // Navigation -----------------------------------------
+  
+  // Detection Navigation
+  const goNextDetection = () => {
     const img = getCurrentImage();
     if (!img) return;
-
     if (currentDetectionIndex < img.detections.length - 1) {
       setCurrentDetectionIndex((i) => i + 1);
-      return;
-    }
-
-    const nextImg = findNextImageWithDetections(currentImageIndex);
-    if (nextImg !== -1) {
-      setCurrentImageIndex(nextImg);
-      setCurrentDetectionIndex(0);
-      updateWindow(nextImg);
     }
   };
 
-  // --- Image-level navigation
-  const moveToNextImage = () => {
-    const nextImg = findNextImageWithDetections(currentImageIndex);
-    if (nextImg !== -1) {
-      setCurrentImageIndex(nextImg);
-      setCurrentDetectionIndex(0);
-      updateWindow(nextImg);
-    }
+  const goPrevDetection = () => {
+    if (currentDetectionIndex > 0) setCurrentDetectionIndex((i) => i - 1);
   };
 
-  const moveToPrevImage = () => {
-    const prevImg = findPrevImageWithDetections(currentImageIndex);
-    if (prevImg !== -1) {
-      setCurrentImageIndex(prevImg);
-      setCurrentDetectionIndex(0);
-      updateWindow(prevImg);
-    }
+  const goToDetection = (index: number) => {
+    const img = getCurrentImage();
+    if (!img) return;
+    if (index >= 0 && index < img.detections.length) setCurrentDetectionIndex(index);
+  };
+
+  // Image navigation
+  const goNextImage = () => {
+    const nextIdx = Math.min(currentImageIndex + 1, metadataRef.current.length - 1);
+    setCurrentImageIndex(nextIdx);
+    setCurrentDetectionIndex(0);
+    updateWindow(nextIdx);
+  };
+
+  const goPrevImage = () => {
+    const prevIdx = Math.max(currentImageIndex - 1, 0);
+    setCurrentImageIndex(prevIdx);
+    setCurrentDetectionIndex(0);
+    updateWindow(prevIdx);
   };
 
   const goToImage = (index: number) => {
@@ -210,15 +165,31 @@ export const useDetectionData = () => {
     }
   };
 
-  // --- Progress helpers
+  // Validation ----------------------------------------------
+ 
+  const validateDetection = (
+    decision: "correct" | "healthy" | "other" | "uncertain",
+    className?: string
+  ) => {
+    const detection = getCurrentDetection();
+    if (!detection) return;
+
+    detection.validated = true;
+    detection.validatedAs = decision === "other" ? className : decision;
+
+    setValidationResults((prev) => [
+      ...prev,
+      { detectionId: detection.id, decision, className: decision === "other" ? className : undefined },
+    ]);
+  };
+
+  // Progress --------------------------------------------
+
   const getTotalDetections = () =>
     metadataRef.current.reduce((total, img) => total + img.detections.length, 0);
 
   const getValidatedCount = () =>
-    metadataRef.current.reduce(
-      (total, img) => total + img.detections.filter((d) => d.validated).length,
-      0
-    );
+    metadataRef.current.reduce((total, img) => total + img.detections.filter((d) => d.validated).length, 0);
 
   const getProgress = () => {
     const total = getTotalDetections();
@@ -246,9 +217,11 @@ export const useDetectionData = () => {
     getImageCount,
 
     reloadMetadata,
-    moveToNext,
-    moveToNextImage,
-    moveToPrevImage,
+    goNextDetection,
+    goPrevDetection,
+    goToDetection,
+    goNextImage,
+    goPrevImage,
     goToImage,
   };
 };
