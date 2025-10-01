@@ -7,6 +7,7 @@ from pymongo import MongoClient, errors
 from dotenv import load_dotenv
 from pathlib import Path
 from urllib.parse import urlparse, unquote
+from pymongo import ASCENDING
 
 import shutil
 import tempfile
@@ -30,12 +31,16 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = os.getenv("DB_NAME", "hitl_db")
-COLLECTION_NAME = "images"
+COLLECTION_NAME = "images_yolov11_v1"
 
 # MongoDB Connection 
 client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
 db = client[DB_NAME]
 images = db[COLLECTION_NAME]
+
+# Ensure indexes are created once on startup
+images.create_index([("image_id", ASCENDING)])
+images.create_index([("created_at", ASCENDING)])
 
 # * optimise this later for multiple model selection
 detector = PlantDefectDetector("models/HQx1280.pt")
@@ -69,15 +74,14 @@ def root(): return {"message": "hello haha world"}
 
 # Base folder where metadata is stored
 app.mount("/data", StaticFiles(directory="data"), name="data")
-
 DATA_ROOT = "data"
 DETECTION_VERSION = "detection_v1"  # default
 VERSION_DIR = os.path.join(DATA_ROOT, DETECTION_VERSION)
-
 original_dir = os.path.join(VERSION_DIR, "original_img")   
 processed_dir = os.path.join(VERSION_DIR, "processed_img") 
 crops_dir = os.path.join(VERSION_DIR, "crops")             
 default_metadata_file = os.path.join(VERSION_DIR, f"{DETECTION_VERSION}_metadata.json")  
+
 
 @app.get("/metadata")
 async def get_metadata(file: str = Query(default=default_metadata_file, description="Metadata file path")):
@@ -185,8 +189,6 @@ def save_metadata(results: list, metadata_file: str = default_metadata_file):
     with open(metadata_file, "w") as f:
         json.dump(results, f, indent=2)
     print("💾 Saved metadata to JSON fallback")
-
-# delete function add here / delete detections or delete image
 
 # Validation Process ------------------------------------------
 
