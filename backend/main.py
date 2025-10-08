@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = os.getenv("DB_NAME", "hitl_db")
-COLLECTION_NAME = "images_yolov11_v1"
+COLLECTION_NAME = "images"
 
 # MongoDB Connection 
 client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)

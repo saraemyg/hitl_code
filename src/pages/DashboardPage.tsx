@@ -16,6 +16,13 @@ const COLORS = [
   "#f7dd72", // yellow
 ];
 
+// COLORS for validation statuses
+const STATUS_COLORS: Record<string, string> = {
+  Validated: "#82ca9d", // green
+  Unvalidated: "#e7bfc3ff", // pink
+  Healthy: "#95b9de", // blue
+  Uncertain: "#f7dd72", // yellow
+};
 
 const DashboardPage: React.FC = () => {
   const [defectCounts, setDefectCounts] = useState<DefectCount[]>([]);
@@ -27,7 +34,7 @@ const DashboardPage: React.FC = () => {
         return acc;
     },
     {} as Record<string, string>
-    );
+  );
 
   useEffect(() => {
     fetch("http://localhost:8000/metadata")
@@ -38,6 +45,7 @@ const DashboardPage: React.FC = () => {
           validated: 0,
           unvalidated: 0,
           healthy: 0,
+          uncertain: 0,
         };
 
         data.forEach((item: any) => {
@@ -47,6 +55,7 @@ const DashboardPage: React.FC = () => {
 
             if (det.status === "validated") statusCount.validated++;
             else if (det.status === "healthy") statusCount.healthy++;
+            else if (det.status === "uncertain") statusCount.uncertain++;
             else statusCount.unvalidated++;
           });
         });
@@ -69,6 +78,7 @@ const DashboardPage: React.FC = () => {
   }, []);
 
   const chartData = selectedData === "defect" ? defectCounts : validationStatus;
+  const colorSource =selectedData === "defect" ? DEFECT_COLORS : STATUS_COLORS;
 
   return (
     <div className="p-6 bg-gray-100 h-[60vh]">
@@ -109,7 +119,7 @@ const DashboardPage: React.FC = () => {
                 {chartData.map((entry, index) => (
                   <Cell
                     key={`cell-${entry.name}`}
-                    fill={DEFECT_COLORS[entry.name] || "#ccc"} // fallback gray
+                    fill={colorSource[entry.name] || "#ccc"} // fallback gray
                   />
                 ))}
               </Pie>
@@ -143,7 +153,7 @@ const DashboardPage: React.FC = () => {
                 {chartData.map((entry, index) => (
                   <Cell
                     key={`bar-${entry.name}`}
-                    fill={DEFECT_COLORS[entry.name] || "#ccc"}
+                    fill={colorSource[entry.name] || "#ccc"}
                   />
                 ))}
               </Bar>

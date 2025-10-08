@@ -229,10 +229,10 @@ export const ValidationPage: React.FC = () => {
 
           {/* ===== Toolbar ===== */}
           <div className="flex items-center gap-2 mt-4">
-            <div className="flex items-center gap-2 bg-white rounded-lg shadow-sm border px-2">
+            {/* <div className="flex items-center gap-2 bg-white rounded-lg shadow-sm border px-2">
               <Filter size={16} className="text-gray-400" />
               <select className="py-2 pl-1 pr-8 bg-transparent border-none text-sm focus:ring-0 cursor-pointer"></select>
-            </div>
+            </div> */}
 
             {/* Prev / Next Image */}
             <button
@@ -279,13 +279,13 @@ export const ValidationPage: React.FC = () => {
                 >
                   {`${currentImageIndex + 1} / ${getImageCount()} — ${currentImage?.uploaded_img?.split("/").pop()}`}
                 </button>
-                <button
+                {/* <button
                   onClick={() => setShowAltView(!showAltView)}
                   className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 flex items-center gap-1 text-sm shadow"
                 >
                   <Layout size={16} />
                   {showAltView ? "Back to Main" : "Open Alt View"}
-                </button>
+                </button> */}
               </div>
             </div>
           </div>
@@ -297,18 +297,22 @@ export const ValidationPage: React.FC = () => {
         ) : (
           <div className="parent grid grid-cols-10 grid-rows-10 gap-1 h-screen overflow-hidden">
             {/* Full Image */}
-            <div className="div3 col-start-1 col-end-7 row-start-1 row-end-6 bg-white rounded-lg shadow p-2 flex flex-col">
+            <div className="div1 col-start-1 col-end-7 row-start-1 row-end-6 bg-white rounded-lg shadow p-2 flex flex-col">
               <h3 className="text-sm font-semibold text-gray-800 mb-2">Full Image</h3>
               <div className="flex-1 overflow-hidden">
-                <ImageViewer imageSrc={currentImage?.processed_img || PLACEHOLDER_IMAGE.path} />
+                <ImageViewer imageSrc={currentImage?.processed_img || PLACEHOLDER_IMAGE.path} 
+                zoomable={true} // enable zoom + slider + keyboard control
+                />
               </div>
             </div>
 
             {/* Cropped Region */}
-            <div className="div1 col-start-7 col-end-9 row-start-1 row-end-6 bg-white rounded-lg shadow p-2 flex flex-col relative">
+            <div className="div2 col-start-7 col-end-9 row-start-1 row-end-6 bg-white rounded-lg shadow p-2 flex flex-col relative">
               <h3 className="text-sm font-semibold text-gray-800 mb-2">Detected Region</h3>
               <div className="flex-1 overflow-hidden relative">
-                <ImageViewer imageSrc={currentDetection?.crop || PLACEHOLDER_IMAGE.path} />
+                <ImageViewer imageSrc={currentDetection?.crop || PLACEHOLDER_IMAGE.path} 
+                zoomable={false} // static, no zoom/slider
+                />
               </div>
               {currentDetection.status === "validated" && (
                 <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1 shadow-lg z-10">
@@ -328,7 +332,7 @@ export const ValidationPage: React.FC = () => {
             </div>
 
             {/* Info Panel */}
-            <div className="div2 col-start-9 col-end-11 row-start-1 row-end-11 bg-white rounded-lg shadow p-2 overflow-y-auto">
+            <div className="div3 col-start-9 col-end-11 row-start-1 row-end-9 bg-white rounded-lg shadow p-2 overflow-y-auto">
               <InfoPanel
                 currentImage={currentImage}
                 currentDetection={currentDetection}
@@ -339,7 +343,7 @@ export const ValidationPage: React.FC = () => {
             <div className="div4 col-start-1 col-end-9 row-start-6 row-end-7 bg-white rounded-lg shadow p-2"> <Navigator /> </div>
 
             {/* Validation Controls */}
-            <div className="div5 col-start-1 col-end-9 row-start-7 row-end-11 bg-white rounded-lg shadow p-2 flex flex-col">
+            <div className="div5 col-start-1 col-end-9 row-start-7 row-end-9 bg-white rounded-lg shadow p-2 flex flex-col">
               <ValidationControls
                 currentDetection={currentDetection}
                 goNextDetection={goNextDetection} // still pass, but handled by parent
@@ -359,6 +363,7 @@ export const ValidationPage: React.FC = () => {
                 }}
               />
             </div>
+            
           </div>
         )}
       </div>

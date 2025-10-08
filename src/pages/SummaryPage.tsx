@@ -75,7 +75,7 @@ useEffect(() => {
             {/* Toggle Dashboard Overlay */}
             <button
               onClick={() => setShowDashboard((prev) => !prev)}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+              className="bg-gray-300 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
             >
               {showDashboard ? (
                 <>
@@ -110,20 +110,32 @@ useEffect(() => {
       <section>
         <div className="grid grid-cols-4 grid-rows-2 gap-4">
           {/* Palette top-left */}
-          <div className="bg-white rounded-lg shadow p-4 flex items-center justify-center">
-            <div className="bg-white rounded-lg shadow p-4 flex items-center justify-center aspect-[4/3]">
+          <div className="bg-white rounded-lg shadow p-4 flex flex-col items-center justify-center">
+            {/* Image container */}
+            <div className="bg-white rounded-lg shadow p-4 aspect-[4/3] flex items-center justify-center">
               <img
                 src="/backend/reference_images/all_classes_palette.png"
                 alt="All Classes Palette"
                 className="w-full h-full object-cover rounded"
               />
             </div>
-            {/* Button now sits with the palette */}
+            <p className="mt-3 text-sm font-medium text-gray-700">Colour Palette</p>
+            {/* Button under image */}
             <button
               onClick={() => setShowConfidence((prev) => !prev)}
-              className="mt-3 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg"
+              className="mt-4 bg-gray-200 hover:bg-gray-200 text-gray-500 px-4 py-2 rounded-lg flex items-center gap-2 transition"
             >
-              {showConfidence ? "Hide Confidence" : "Show Confidence"}
+              {showConfidence ? (
+                <>
+                  <EyeOff size={16} />
+                  <span>Hide AI Confidence</span>
+                </>
+              ) : (
+                <>
+                  <Eye size={16} />
+                  <span>Show AI Confidence</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -170,13 +182,13 @@ useEffect(() => {
                         />
                         {/* overlay confidence */}
                         {showConfidence && (() => {
-                          const percentage = (img.confidence) * 100;
-                          let colorClass = "bg-red-600";
+                          const percentage = img.confidence * 100;
+                          let colorClass = "bg-red-600/80"; // default with 80% opacity
 
                           if (percentage >= 80) {
-                            colorClass = "bg-green-600";
+                            colorClass = "bg-green-600/80";
                           } else if (percentage >= 50) {
-                            colorClass = "bg-yellow-500 text-black";
+                            colorClass = "bg-yellow-500/80 text-black";
                           }
 
                           return (
