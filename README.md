@@ -3,12 +3,12 @@
 How To run : ------------------------------------------------------------
 
 Terminal 1 : 
-npm run dev
+- npm run dev
 
 Terminal 2 :
-conda activate (yourenvironmentname)
-cd backend
-python main.py
+- conda activate (yourenvironmentname)
+- cd backend
+- python main.py
 
 Folder structure : ------------------------------------------------------
 
@@ -16,9 +16,9 @@ Folder structure : ------------------------------------------------------
 
 Pages :
 1. SummaryPage.tsx : Main Image Gallery for All Defect as References
-   DashboardPage.tsx : Data Visualisation of Current Data (Defect,Validation)
+2. -> DashboardPage.tsx : Data Visualisation of Current Data (Defect,Validation) 
 3. ValidationPage.tsx : Main Validation Page, Navigator ( very important page )
-   AnnotationPage.tsx (WIP) : To fix validation bbox
+4. -> AnnotationPage.tsx (WIP) : To fix validation bbox
 
 Components : 
 - ComfirmModal.tsx : Comfirmation text popup before certain action ( general )
@@ -32,5 +32,6 @@ Hooks :
 
 Context : 
 - MetadataContext.tsx (WIP) : To allow interchanging between different data modules in MongoDB
+
 
 
