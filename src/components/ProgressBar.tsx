@@ -29,7 +29,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
       formData.append('files', file, file.name);
     });
 
-    const response = await fetch('http://localhost:8000/upload-images', {
+    const response = await fetch('http://localhost:8000/upload-images', { 
       method: 'POST',
       body: formData,
     });
