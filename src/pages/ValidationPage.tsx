@@ -229,10 +229,10 @@ export const ValidationPage: React.FC = () => {
 
           {/* ===== Toolbar ===== */}
           <div className="flex items-center gap-2 mt-4">
-            {/* <div className="flex items-center gap-2 bg-white rounded-lg shadow-sm border px-2">
+            <div className="flex items-center gap-2 bg-white rounded-lg shadow-sm border px-2">
               <Filter size={16} className="text-gray-400" />
               <select className="py-2 pl-1 pr-8 bg-transparent border-none text-sm focus:ring-0 cursor-pointer"></select>
-            </div> */}
+            </div>
 
             {/* Prev / Next Image */}
             <button
@@ -279,13 +279,13 @@ export const ValidationPage: React.FC = () => {
                 >
                   {`${currentImageIndex + 1} / ${getImageCount()} — ${currentImage?.uploaded_img?.split("/").pop()}`}
                 </button>
-                {/* <button
+                <button
                   onClick={() => setShowAltView(!showAltView)}
                   className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 flex items-center gap-1 text-sm shadow"
                 >
                   <Layout size={16} />
                   {showAltView ? "Back to Main" : "Open Alt View"}
-                </button> */}
+                </button>
               </div>
             </div>
           </div>
