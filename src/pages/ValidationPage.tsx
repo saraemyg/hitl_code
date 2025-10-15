@@ -152,7 +152,7 @@ export const ValidationPage: React.FC = () => {
 
             return (
               <div
-                key={det.id}
+                key={`${currentImage?.uploaded_img || "img"}-${det.id}-${idx}`}
                 ref={(el) => (itemRefs.current[idx] = el)}
                 onClick={() => {
                   scrollPosRef.current = containerRef.current?.scrollLeft || 0;

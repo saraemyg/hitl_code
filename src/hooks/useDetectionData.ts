@@ -1,34 +1,44 @@
 import { useState, useEffect, useRef } from "react";
 import { ImageData } from "../types";
-import { useMetadata } from "../context/MetadataContext"; 
+import { useMetadata } from "../context/MetadataContext";
 
-const API_BASE = "process.env.NEXT_PUBLIC_API_URL";
+// ----------------------------------------------------------------
+// Utility function to safely get API base URL at runtime
+// ----------------------------------------------------------------
+const getApiBase = () => {
+  return import.meta.env.VITE_API_URL || "http://localhost:8000";
+};
 
-// Utility function to fetch metadata
+// ----------------------------------------------------------------
+// Fetch metadata from backend
+// ----------------------------------------------------------------
 export const fetchDetectionMetadata = async (
-  selectedMetadata?: string // Now optional, we’ll decide fallback inside
-  ): Promise<ImageData[]> => { // if user picked from dropdown, use it; else default to detection_v1
-    const metadataFile = selectedMetadata
-      ? `data/${selectedMetadata}`
-      : "data/detection_v1/detection_v1_metadata.json";
+  selectedMetadata?: string // optional, fallback to default inside
+): Promise<ImageData[]> => {
+  const API_BASE = getApiBase(); // <-- safe here
 
-    let response: Response;
+  const metadataFile = selectedMetadata
+    ? `data/${selectedMetadata}`
+    : "data/detection_v1/detection_v1_metadata.json";
 
-    try {
-      response = await fetch(`${API_BASE}/metadata?file=${metadataFile}&t=${Date.now()}`);
-      if (!response.ok) throw new Error("Fetch failed");
-    } catch (err) {
-      console.warn( `⚠️ Failed to load ${metadataFile}, falling back to detection_v1`,err);
-      // fallback to detection_v1
-      response = await fetch(`${API_BASE}/metadata?file=data/detection_v1/detection_v1_metadata.json&t=${Date.now()}`);
-      if (!response.ok) throw new Error("Failed to fetch detection_v1 metadata");
-    }
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE}/metadata?file=${metadataFile}&t=${Date.now()}`);
+    if (!response.ok) throw new Error("Fetch failed");
+  } catch (err) {
+    console.warn(`⚠️ Failed to load ${metadataFile}, falling back to detection_v1`, err);
+    response = await fetch(
+      `${API_BASE}/metadata?file=detection_v1/detection_v1_metadata.json&t=${Date.now()}`
+    );
+    if (!response.ok) throw new Error("Failed to fetch detection_v1 metadata");
+  }
 
   const metadata = await response.json();
 
   return metadata.map((item: any) => ({
-    uploaded_img: `${API_BASE}/data/${item.uploaded_img}`,
-    processed_img: `${API_BASE}/data/${item.processed_img}`,
+    uploaded_img: `${API_BASE}/${item.uploaded_img}`,
+    processed_img: `${API_BASE}/${item.processed_img}`,
     defect_count: item.defect_count,
     detections: item.detections.map((det: any) => ({
       id: det.id,
@@ -36,7 +46,7 @@ export const fetchDetectionMetadata = async (
       conf: parseFloat(det.conf),
       bbox: det.bbox,
       status: det.status,
-      crop: det.crop ? `${API_BASE}/data/${det.crop}` : null,
+      crop: det.crop ? `${API_BASE}/${det.crop}` : null,
       validated: det.status !== "unvalidated",
       validatedAs: det.status === "unvalidated" ? undefined : det.status,
     })),

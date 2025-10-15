@@ -8,14 +8,20 @@ import { MetadataProvider, useMetadata } from "./context/MetadataContext";
 function AppContent() {
   const { metadataFiles, setMetadataFiles, selectedMetadata, setSelectedMetadata } = useMetadata();
 
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+
   useEffect(() => {
-    fetch("http://localhost:8000/metadata/files")
+    if (!API_BASE) return;
+
+    fetch(`${API_BASE}/metadata/files`)
       .then((res) => res.json())
       .then((data) => {
-        setMetadataFiles(data.files || []);
+        const files = data.files || [];
+        setMetadataFiles(files);
+        if (files.length && !selectedMetadata) setSelectedMetadata(files[0]);
       })
       .catch((err) => console.error("Error fetching metadata files:", err));
-  }, [setMetadataFiles]);
+  }, [setMetadataFiles, selectedMetadata, API_BASE]);
 
   return (
     <Router>

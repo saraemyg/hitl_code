@@ -10,19 +10,18 @@ const SummaryPage: React.FC = () => {
   const [pageIndex, setPageIndex] = useState<Record<string, number>>({});
   const [showConfidence, setShowConfidence] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false); 
-  const [source, setSource] = useState<string>(""); // <-- track backend source
+  const [source, setSource] = useState<string>(""); 
 
 useEffect(() => {
   let cancelled = false;
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
   const fetchMetadata = async () => {
     try {
       const cached = localStorage.getItem("metadata"); // Check cache first
-      if (cached) {
-        setGroupedCrops(JSON.parse(cached));
-      }
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/metadata`);
+      if (cached) { setGroupedCrops(JSON.parse(cached)); }
+      
+      const res = await fetch(`${API_BASE}metadata`);
       if (!res.ok) throw new Error(`Failed with ${res.status}`);
       const data = await res.json();
       if (cancelled) return;
@@ -35,7 +34,7 @@ useEffect(() => {
 
           if (det.crop) {
             groups[type].push({
-              src: `${process.env.NEXT_PUBLIC_API_URL}/data/${det.crop.replace(/\\/g, "/")}`,
+              src: `${API_BASE}/data/${det.crop.replace(/\\/g, "/")}`,
               confidence: det.conf,
             });
           }
