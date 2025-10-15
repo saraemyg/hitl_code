@@ -34,7 +34,11 @@ DB_NAME = os.getenv("DB_NAME", "hitl_db")
 COLLECTION_NAME = "images"
 
 # MongoDB Connection 
-client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+client = MongoClient(
+    MONGO_URI, 
+    tls=True,
+    tlsAllowInvalidCertificates=True,
+    serverSelectionTimeoutMS=5000)
 db = client[DB_NAME]
 images = db[COLLECTION_NAME]
 
