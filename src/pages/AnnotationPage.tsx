@@ -91,7 +91,7 @@ const AnnotationPage: React.FC<AnnotationPageProps> = ({
   const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
 
   // Full URLs
-  const uploadedImageUrl = `http://localhost:8000/uploaded_img/${currentImage?.uploaded_img}`;
+  const uploadedImageUrl = `${process.env.NEXT_PUBLIC_API_URL}/uploaded_img/${currentImage?.uploaded_img}`;
   const processedImageUrl = currentImage?.processed_img;
 
   // Reset zoom/position when image changes
@@ -271,19 +271,19 @@ const AnnotationPage: React.FC<AnnotationPageProps> = ({
                   transition: isDragging ? "none" : "transform 0.2s",
                 }}
               >
-                {currentImage.detections.map((det, idx) => (
-                  <BoundingBox
-                    key={idx}
-                    bbox={det.bbox as [number, number, number, number]}
-                    isHovered={hoveredBox === idx}
-                    defectType={det.defect_type}
-                    confidence={det.confidence}
-                    onMouseEnter={() => setHoveredBox(idx)}
-                    onMouseLeave={() => setHoveredBox(null)}
-                    imageWidth={imageSize.width}   // ✅ pass natural width
-                    imageHeight={imageSize.height} // ✅ pass natural height
-                  />
-                ))}
+                {/* {currentImage.detections.map((det, idx) => (
+                  // <BoundingBox
+                  //   key={idx}
+                  //   bbox={det.bbox as [number, number, number, number]}
+                  //   isHovered={hoveredBox === idx}
+                  //   // defectType={det.defect_type}
+                  //   // confidence={det.confidence}
+                  //   onMouseEnter={() => setHoveredBox(idx)}
+                  //   onMouseLeave={() => setHoveredBox(null)}
+                  //   imageWidth={imageSize.width}   // ✅ pass natural width
+                  //   imageHeight={imageSize.height} // ✅ pass natural height
+                  // />
+                ))} */}
               </div>
             )}
           </div>

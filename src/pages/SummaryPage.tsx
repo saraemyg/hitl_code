@@ -22,7 +22,7 @@ useEffect(() => {
         setGroupedCrops(JSON.parse(cached));
       }
 
-      const res = await fetch("http://localhost:8000/metadata");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/metadata`);
       if (!res.ok) throw new Error(`Failed with ${res.status}`);
       const data = await res.json();
       if (cancelled) return;
@@ -35,7 +35,7 @@ useEffect(() => {
 
           if (det.crop) {
             groups[type].push({
-              src: `http://localhost:8000/data/${det.crop.replace(/\\/g, "/")}`,
+              src: `${process.env.NEXT_PUBLIC_API_URL}/data/${det.crop.replace(/\\/g, "/")}`,
               confidence: det.conf,
             });
           }

@@ -29,7 +29,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
       formData.append('files', file, file.name);
     });
 
-    const response = await fetch('http://localhost:8000/upload-images', { 
+    const response = await fetch('${process.env.NEXT_PUBLIC_API_URL}/upload-images', { 
       method: 'POST',
       body: formData,
     });
@@ -46,7 +46,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   const handleBulkDetect = async () => {
     try {
       setIsDetecting(true);
-      const response = await fetch('http://localhost:8000/bulk-detect', {
+      const response = await fetch('${process.env.NEXT_PUBLIC_API_URL}/bulk-detect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,7 +71,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   const handleConvertYOLOv11 = async () => {
     try {
       setIsConverting(true);
-      const response = await fetch('http://localhost:8000/convert-yolov11', {
+      const response = await fetch('${process.env.NEXT_PUBLIC_API_URL}convert-yolov11', {
         method: 'POST',
       });
 
@@ -90,7 +90,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   // --- Download Yolov11 handler ---
   const handleDownloadAnnotations = async () => {
     try {
-      const response = await fetch('http://localhost:8000/download-annotations', {
+      const response = await fetch('${process.env.NEXT_PUBLIC_API_URL}/download-annotations', {
         method: 'GET',
       });
 
@@ -121,7 +121,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/clear-folder/${folderType}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/clear-folder/${folderType}`, {
         method: "DELETE",
       });
 

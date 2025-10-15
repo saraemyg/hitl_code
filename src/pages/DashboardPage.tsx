@@ -37,7 +37,7 @@ const DashboardPage: React.FC = () => {
   );
 
   useEffect(() => {
-    fetch("http://localhost:8000/metadata")
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/metadata`)
       .then((res) => res.json())
       .then((data) => {
         const typeCount: Record<string, number> = {};

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { ImageData } from "../types";
 import { useMetadata } from "../context/MetadataContext"; 
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "process.env.NEXT_PUBLIC_API_URL";
 
 // Utility function to fetch metadata
 export const fetchDetectionMetadata = async (

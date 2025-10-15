@@ -42,7 +42,7 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
         body.type = currentDetection.type;       
       }
 
-      const res = await fetch(`http://localhost:8000/detections/validate`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/detections/validate`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -67,7 +67,7 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
       const body = { crop: currentDetection.crop };
       console.log("Deleting detection (frontend) for crop:", body.crop);
 
-      const res = await fetch(`http://localhost:8000/detections/delete`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/detections/delete`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
