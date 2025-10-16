@@ -3,11 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from pymongo import MongoClient, errors
+from pymongo import MongoClient, errors, ASCENDING
 from dotenv import load_dotenv
-from pathlib import Path
 from urllib.parse import urlparse, unquote
-from pymongo import ASCENDING
+from pathlib import Path
 
 import shutil
 import tempfile
@@ -21,9 +20,9 @@ from PIL import Image
 from datetime import datetime
 from typing import List
 
-from model_handler import PlantDefectDetector
-# from yolo_converter import convert_to_yolov11
+from model_handler import PlantDefectDetector # from yolo_converter import convert_to_yolov11
 
+# Setup Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -35,9 +34,7 @@ COLLECTION_NAME = "images"
 
 # MongoDB Connection 
 client = MongoClient(
-    MONGO_URI, 
-    tls=True,
-    tlsAllowInvalidCertificates=True,
+    MONGO_URI, tls=True, tlsAllowInvalidCertificates=True,
     serverSelectionTimeoutMS=5000)
 db = client[DB_NAME]
 images = db[COLLECTION_NAME]
@@ -46,7 +43,7 @@ images = db[COLLECTION_NAME]
 images.create_index([("image_id", ASCENDING)])
 images.create_index([("created_at", ASCENDING)])
 
-# * optimise this later for multiple model selection
+# Model Initialisation * optimise this later for multiple model selection
 detector = PlantDefectDetector("models/HQx1280.pt")
 
 @asynccontextmanager
@@ -58,13 +55,14 @@ async def lifespan(app: FastAPI):
         elapsed = time.time() - start_time
         logger.info(f"Model {detector.model_path} successfully loaded in {elapsed:.2f} seconds")
     except Exception as e:
-        logger.error(f"error loading model: {e}")
+        logger.error(f"Error loading model: {e}")
         raise
     yield
-    logger.info("app is shutting down...")
+    logger.info("App is shutting down...")
 
 app = FastAPI(title="Plant Defect Detection API", lifespan=lifespan)
 
+# CORS Setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -77,8 +75,7 @@ app.add_middleware(
 def root(): return {"message": "hello haha world"}
 
 # Base folder where metadata is stored
-app.mount("/data", StaticFiles(directory="data"), name="data")
-DATA_ROOT = "data"
+DATA_ROOT = os.path.join("public", "data")
 DETECTION_VERSION = "detection_v1"  # default
 VERSION_DIR = os.path.join(DATA_ROOT, DETECTION_VERSION)
 original_dir = os.path.join(VERSION_DIR, "original_img")   
@@ -86,48 +83,43 @@ processed_dir = os.path.join(VERSION_DIR, "processed_img")
 crops_dir = os.path.join(VERSION_DIR, "crops")             
 default_metadata_file = os.path.join(VERSION_DIR, f"{DETECTION_VERSION}_metadata.json")  
 
+app.mount("/data", StaticFiles(directory="data"), name="data")
 
 @app.get("/metadata")
 async def get_metadata(file: str = Query(default=default_metadata_file, description="Metadata file path")):
     """Fetch metadata from MongoDB if available, else JSON fallback"""
     try:
         client.admin.command("ping")  # test Mongo
-        print("✅ [Mongo] Fetching metadata from Atlas")
+        print("[Mongo] Fetching metadata from Atlas")
         docs = list(images.find({}, {"_id": 0}))
         return JSONResponse(content=docs)
     except errors.PyMongoError as e:
-        print(f"⚠️ [Mongo Error] {e}, falling back to JSON")
+        print(f"[Mongo Error] {e}, falling back to JSON")
 
     # JSON fallback
     if os.path.exists(file):
         try:
             with open(file, "r") as f:
                 metadata = json.load(f)
-            print(f"💾 [JSON] Loaded metadata from {file}")
+            print(f"[JSON] Loaded metadata from {file}")
             return JSONResponse(content=metadata)
         except json.JSONDecodeError:
-            print(f"❌ [JSON] Invalid JSON format in {file}")
+            print(f"[JSON] Invalid JSON format in {file}")
             return JSONResponse(content={"error": f"Invalid JSON format in {file}"}, status_code=500)
-    print(f"❌ [JSON] Metadata file '{file}' not found")
+    print(f"[JSON] Metadata file '{file}' not found")
     return JSONResponse(content={"error": f"Metadata file '{file}' not found"}, status_code=404)
 
 
 @app.get("/metadata/files")
 async def list_metadata_files():
-    """
-    List available metadata sources.
-    If Mongo is up, return 'MongoDB Atlas'.
-    Always list JSON files under data/ as fallback.
-    """
+    """ List available metadata sources. If Mongo is up, return 'MongoDB Atlas'. Always list JSON files under data/ as fallback. """
     sources = []
-
-    # Check Mongo
     try:
-        client.admin.command("ping")
-        print("✅ [Mongo] Atlas available")
+        client.admin.command("ping")  # Check Mongo
+        print(" [Mongo] Atlas available")
         sources.append("MongoDB Atlas")
     except errors.PyMongoError as e:
-        print(f"⚠️ [Mongo Error] {e}, MongoDB unavailable")
+        print(f" [Mongo Error] {e}, MongoDB unavailable")
 
     # JSON files fallback
     if os.path.exists(DATA_ROOT):
@@ -137,7 +129,7 @@ async def list_metadata_files():
                     rel_path = os.path.relpath(os.path.join(root, f), DATA_ROOT)
                     sources.append(rel_path.replace("\\", "/"))
 
-    print("📂 Available metadata sources:", sources)
+    print(" Available metadata sources:", sources)
     return JSONResponse(content={"files": sources})
 
     
@@ -145,10 +137,10 @@ async def list_metadata_files():
 def load_metadata(file: str = default_metadata_file):
     try:
         client.admin.command("ping")  # check Mongo connection
-        print("✅ Using MongoDB for metadata")
+        print(" Using MongoDB for metadata")
         return list(images.find({}, {"_id": 0}))  # strip ObjectId
     except errors.PyMongoError:
-        print("⚠️ Mongo unavailable, falling back to JSON")
+        print(" Mongo unavailable, falling back to JSON")
         if not os.path.exists(file):
             return []
         with open(file, "r") as f:
