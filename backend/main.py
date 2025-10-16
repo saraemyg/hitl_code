@@ -75,15 +75,25 @@ app.add_middleware(
 def root(): return {"message": "hello haha world"}
 
 # Base folder where metadata is stored
-DATA_ROOT = os.path.join("public", "data")
+BASE_DIR = Path(__file__).resolve().parent.parent  # go up from backend/ to project root
+DATA_ROOT = BASE_DIR / "public" / "data"
 DETECTION_VERSION = "detection_v1"  # default
-VERSION_DIR = os.path.join(DATA_ROOT, DETECTION_VERSION)
-original_dir = os.path.join(VERSION_DIR, "original_img")   
-processed_dir = os.path.join(VERSION_DIR, "processed_img") 
-crops_dir = os.path.join(VERSION_DIR, "crops")             
-default_metadata_file = os.path.join(VERSION_DIR, f"{DETECTION_VERSION}_metadata.json")  
+VERSION_DIR = DATA_ROOT / DETECTION_VERSION
+original_dir = VERSION_DIR / "original_img"
+processed_dir = VERSION_DIR / "processed_img"
+crops_dir = VERSION_DIR / "crops"
+default_metadata_file = VERSION_DIR / f"{DETECTION_VERSION}_metadata.json"
 
-app.mount("/data", StaticFiles(directory="public/data"), name="data")
+# Ensure all directories exist
+for p in [original_dir, processed_dir, crops_dir]:
+    p.mkdir(parents=True, exist_ok=True)
+
+# Mount static folders for serving public data
+if DATA_ROOT.exists():
+    app.mount("/data", StaticFiles(directory=str(DATA_ROOT)), name="data")
+    app.mount(f"/{DETECTION_VERSION}", StaticFiles(directory=str(VERSION_DIR)), name=DETECTION_VERSION)
+else:
+    logger.warning(f"[Static Mount Warning] DATA_ROOT not found: {DATA_ROOT}")
 
 @app.get("/metadata")
 async def get_metadata(file: str = Query(default=default_metadata_file, description="Metadata file path")):
