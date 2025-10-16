@@ -83,7 +83,7 @@ processed_dir = os.path.join(VERSION_DIR, "processed_img")
 crops_dir = os.path.join(VERSION_DIR, "crops")             
 default_metadata_file = os.path.join(VERSION_DIR, f"{DETECTION_VERSION}_metadata.json")  
 
-app.mount("/data", StaticFiles(directory="data"), name="data")
+app.mount("/data", StaticFiles(directory="public/data"), name="data")
 
 @app.get("/metadata")
 async def get_metadata(file: str = Query(default=default_metadata_file, description="Metadata file path")):
