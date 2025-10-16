@@ -313,6 +313,21 @@ export const ValidationPage: React.FC = () => {
                 <ImageViewer imageSrc={currentDetection?.crop || PLACEHOLDER_IMAGE.path} 
                 zoomable={false} // static, no zoom/slider
                 />
+
+                {/* Frosted Placeholder Overlay for No Detection */}
+                {currentImage?.detections?.length === 0 && (
+                  <div className="absolute inset-0 bg-white/50 backdrop-blur-md flex flex-col items-center justify-center rounded-lg z-20 animate-fadeIn">
+                    {/* Floating animated plant */}
+                    <span className="text-6xl mb-2 animate-floating">🌿</span>
+                    <p className="text-green-700 font-semibold text-base">
+                      This plant image has no detection!
+                    </p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      Looks perfectly healthy — nothing to validate.
+                    </p>
+                  </div>
+                )}
+
               </div>
               {currentDetection.status === "validated" && (
                 <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1 shadow-lg z-10">
@@ -332,25 +347,39 @@ export const ValidationPage: React.FC = () => {
             </div>
 
             {/* Info Panel */}
-            <div className="div3 col-start-9 col-end-11 row-start-1 row-end-9 bg-white rounded-lg shadow p-2 overflow-y-auto">
-              <InfoPanel
-                currentImage={currentImage}
-                currentDetection={currentDetection}
-              />
+            <div className="div3 col-start-9 col-end-11 row-start-1 row-end-9 bg-white rounded-lg shadow relative overflow-y-auto">
+              {currentImage?.detections?.length === 0 && (
+                <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-30 animate-fadeIn">
+                </div>
+              )}
+
+              <InfoPanel currentImage={currentImage} currentDetection={currentDetection} />
             </div>
 
             {/* Navigator */}
-            <div className="div4 col-start-1 col-end-9 row-start-6 row-end-7 bg-white rounded-lg shadow p-2"> <Navigator /> </div>
+            <div className="div4 col-start-1 col-end-9 row-start-6 row-end-7 bg-white rounded-lg shadow p-2 relative">
+              {currentImage?.detections?.length === 0 && (
+                <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-20 animate-fadeIn text-center px-3">
+                  <p className="text-xs text-gray-600 italic">
+                    You detect a defect? Don’t worry — new features to annotate will be coming soon.
+                    <br />
+                    <span className="text-green-600 font-medium">(InsyaAllah)</span>
+                  </p>
+                </div>
+              )}
+
+              <Navigator />
+            </div>
 
             {/* Validation Controls */}
-            <div className="div5 col-start-1 col-end-9 row-start-7 row-end-9 bg-white rounded-lg shadow p-2 flex flex-col">
+            <div className="div5 col-start-1 col-end-9 row-start-7 row-end-9 bg-white rounded-lg shadow p-2 flex flex-col relative overflow-hidden">
               <ValidationControls
                 currentDetection={currentDetection}
-                goNextDetection={goNextDetection} // still pass, but handled by parent
-                onValidate={async (decision, type) => {               
-                  validateDetection(decision, type || currentDetection.type); // validate detection in parent state                  
-                  await reloadMetadata(); // reload metadata from backend (await to ensure it completes)      
-                  goNextDetection(); // after reload, safely move to next detection
+                goNextDetection={goNextDetection}
+                onValidate={async (decision, type) => {
+                  validateDetection(decision, type || currentDetection.type);
+                  await reloadMetadata();
+                  goNextDetection();
                 }}
                 onDelete={async (crop) => {
                   console.log("Parent onDelete called for crop:", crop);
@@ -362,6 +391,11 @@ export const ValidationPage: React.FC = () => {
                   }
                 }}
               />
+              {/* Frosted overlay just for ValidationControls */}
+              {currentImage?.detections?.length === 0 && (
+                <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-30">
+                </div>
+              )}
             </div>
             
           </div>

@@ -264,7 +264,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
           </p>
           <div className="aspect-[4/3] overflow-hidden rounded">
             <img
-              src="/backend/reference_images/all_classes_palette.png"
+              src="/public/all_classes_palette.png"
               alt="All Classes Palette"
               className="w-full h-full object-cover rounded"
             />

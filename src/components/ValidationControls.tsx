@@ -22,6 +22,7 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
   const [selectedClass, setSelectedClass] = useState(DEFECT_CLASSES[0]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const getApiBase = () => { return import.meta.env.VITE_API_URL || "http://localhost:8000"; };
 
   // validate detection + auto-advance
   const validateDetection = async (
@@ -31,18 +32,13 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
     if (!currentDetection) return;
 
     try {
-      let body: any = {
-        crop: currentDetection.crop,            
+      const body: any = {
+        crop: currentDetection.crop,
         decision,
+        type: decision === "other" && type ? type : currentDetection.type,
       };
 
-      if (decision === "other" && type) {
-        body.type = type;
-      } else {
-        body.type = currentDetection.type;       
-      }
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/detections/validate`, {
+      const res = await fetch(`${getApiBase()}/detections/validate`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -67,20 +63,19 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
       const body = { crop: currentDetection.crop };
       console.log("Deleting detection (frontend) for crop:", body.crop);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/detections/delete`, {
+      const res = await fetch(`${getApiBase()}/detections/delete`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
       if (!res.ok) {
-        // attempt to parse error message
-        const errBody = await res.json().catch(() => null);
+        const errBody = await res.json().catch(() => null); // attempt to parse error message
         throw new Error(errBody?.detail || res.statusText || "Delete failed");
       }
 
       const result = await res.json();
-      console.log("✅ Delete result:", result);
+      console.log(" Delete result:", result);
 
       // notify parent so the page can reload metadata / advance
       onDelete?.(currentDetection.crop || "");
@@ -92,7 +87,6 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
       // goNextDetection?.();
     } catch (err) {
       console.error("Error deleting detection:", err);
-      // optional: show user feedback
       alert("Failed to delete detection: " + (err as Error).message);
       setShowDeleteModal(false);
     } finally {

@@ -77,6 +77,10 @@ export const useDetectionData = () => {
   // Filter control (used only for UI)
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [data, setData] = useState<ImageData[]>([]); // store loaded metadata
+
   // Helpers -----------------------------------------------------
 
   // Filter helper get filtered metadata for UI (thumbnails, progress)
@@ -108,22 +112,21 @@ export const useDetectionData = () => {
   };
 
   // Metadata ------------------------------------------------
-  // Pure reload (does NOT reset user navigation)
+    // ✅ Unified reload
   const reloadMetadata = async () => {
-    const newMetadata = await fetchDetectionMetadata(selectedMetadata);
-    metadataRef.current = newMetadata;
-
-    // Keep current indexes valid after reload
-    const clampedImageIndex = Math.min(currentImageIndex, newMetadata.length - 1);
-    setCurrentImageIndex(clampedImageIndex);
-
-    const clampedDetectionIndex = Math.min(
-      currentDetectionIndex,
-      newMetadata[clampedImageIndex]?.detections.length - 1 || 0
-    );
-    setCurrentDetectionIndex(clampedDetectionIndex);
-
-    updateWindow(clampedImageIndex);
+    setLoading(true);
+    setError(null);
+    try {
+      const newMetadata = await fetchDetectionMetadata(selectedMetadata);
+      metadataRef.current = newMetadata;
+      setData(newMetadata); // keep copy for read-only access
+      updateWindow(currentImageIndex);
+    } catch (err: any) {
+      console.error("Failed to reload metadata:", err);
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Auto reload on metadata change
@@ -210,6 +213,11 @@ export const useDetectionData = () => {
   const getImageCount = () => metadataRef.current.length;
 
   return {
+
+    data,
+    loading,
+    error,
+    
     windowData,
     currentImageIndex,
     currentDetectionIndex,

@@ -1,11 +1,15 @@
 import React, { useRef, useState } from 'react';
 import { Download, Trash2 } from 'lucide-react';
+import heic2any from "heic2any";
 
 // Add available models
 const AVAILABLE_MODELS = [
   { id: 'HQx1280', name: 'High Quality 1280px' },
   { id: 'modelv4_l_0.2', name: 'Model v4 Large' }
 ];
+
+// Helper function to get API base URL (for Vite)
+const getApiBase = () => { return import.meta.env.VITE_API_URL || "http://localhost:8000";};
 
 interface ProgressBarProps {
   progress: number;
@@ -25,20 +29,53 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     if (!files || files.length === 0) return;
 
     const formData = new FormData();
-    Array.from(files).forEach(file => {
-      formData.append('files', file, file.name);
-    });
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload-images`, { 
-      method: 'POST',
-      body: formData,
-    });
+    for (const file of Array.from(files)) {
+      let uploadFile = file;
 
-    const result = await response.json();
-    if (result.success) {
-      alert(`Uploaded files: ${result.saved_files.join(', ')}`);
-    } else {
-      alert('Bulk upload failed');
+      if (file.name.toLowerCase().endsWith(".heic")) {
+        try {
+          const result = await heic2any({
+            blob: file,
+            toType: "image/jpeg",
+            quality: 0.9,
+          });
+
+          // handle Blob or Blob[]
+          const blob = Array.isArray(result) ? result[0] : result;
+
+          uploadFile = new File(
+            [blob],
+            file.name.replace(/\.heic$/i, ".jpg"),
+            { type: "image/jpeg" }
+          );
+
+          console.log(`Converted ${file.name} → ${uploadFile.name}`);
+        } catch (err) {
+          console.error("HEIC conversion failed:", err);
+          alert(`Failed to convert ${file.name}. Skipping.`);
+          continue;
+        }
+      }
+
+      formData.append("files", uploadFile, uploadFile.name);
+    }
+
+    try {
+      const response = await fetch(`${getApiBase()}/upload-images`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert(`✅ Uploaded files: ${result.saved_files.join(", ")}`);
+      } else {
+        alert("❌ Bulk upload failed");
+      }
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert("Upload failed! Check console for details.");
     }
   };
 
@@ -46,11 +83,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   const handleBulkDetect = async () => {
     try {
       setIsDetecting(true);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bulk-detect`, {
+      const response = await fetch(`${getApiBase()}/bulk-detect`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json',},
         body: JSON.stringify({ model: selectedModel })
       });
 
@@ -71,14 +106,14 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   const handleConvertYOLOv11 = async () => {
     try {
       setIsConverting(true);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/convert-yolov11`, {
+      const response = await fetch(`${getApiBase()}/convert-yolov11`, {
         method: 'POST',
       });
 
       const result = await response.json();
       console.log(result);
 
-      alert(`✅ Conversion complete: ${result.output_path}`);
+      alert(`Conversion complete: ${result.output_path}`);
     } catch (error) {
       console.error("Conversion failed", error);
       alert("Conversion failed!");
@@ -90,7 +125,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   // --- Download Yolov11 handler ---
   const handleDownloadAnnotations = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/download-annotations`, {
+      const response = await fetch(`${getApiBase()}/download-annotations`, {
         method: 'GET',
       });
 
@@ -121,7 +156,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/clear-folder/${folderType}`, {
+      const response = await fetch(`${getApiBase()}/clear-folder/${folderType}`, {
         method: "DELETE",
       });
 
@@ -196,13 +231,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           >
             Upload Image
           </button>
-          {/* <button
+          <button
             className="ml-1 p-2 bg-red-100 rounded hover:bg-red-200"
             onClick={() => clearFolder("uploaded")}
             title="Clear uploaded images"
           >
             <Trash2 size={16} className="text-red-600" />
-          </button> */}
+          </button>
         </div>
         <input
           type="file"
@@ -233,13 +268,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           >
             Run Detection
           </button>
-          {/* <button
+          <button
             className="p-2 bg-red-100 rounded hover:bg-red-200"
             onClick={() => clearFolder("processed")}
             title="Clear processed images"
           >
             <Trash2 size={16} className="text-red-600" />
-          </button> */}
+          </button>
         </div>
 
         {/* Convert */}
@@ -250,13 +285,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           >
             Convert to YOLOv11 Format
           </button>
-          {/* <button
+          <button
             className="ml-1 p-2 bg-red-100 rounded hover:bg-red-200"
             onClick={() => clearFolder("converted")}
             title="Clear converted files"
           >
             <Trash2 size={16} className="text-red-600" />
-          </button> */}
+          </button>
         </div>
 
         {/* Download */}

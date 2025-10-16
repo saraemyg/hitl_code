@@ -10,11 +10,7 @@ interface ConfirmModalProps {
   onCancel: () => void;
 }
 
-/**
- * Minimal reusable confirmation modal.
- * - Simple, styled with Tailwind so it matches your app.
- * - Accessible-ish: traps and focus are out of scope for brevity, but can be added.
- */
+//  * Minimal reusable confirmation modal.
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
   open,
   title = "Confirm",
