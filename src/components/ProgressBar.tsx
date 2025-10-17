@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { Download, Trash2 } from 'lucide-react';
-import heic2any from "heic2any";
 
 // Add available models
 const AVAILABLE_MODELS = [
@@ -23,6 +22,23 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   const [isConverting, setIsConverting] = useState(false);
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
 
+  // --- Lazy import heic2any only in browser ---
+  const convertHEIC = async (file: File) => {
+    const { default: heic2any } = await import("heic2any");
+
+    const result = await heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.9,
+    });
+
+    const blob = Array.isArray(result) ? result[0] : result;
+
+    return new File([blob], file.name.replace(/\.heic$/i, ".jpg"), {
+      type: "image/jpeg",
+    });
+  };
+
   // --- Upload handler ---
   const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -35,21 +51,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
 
       if (file.name.toLowerCase().endsWith(".heic")) {
         try {
-          const result = await heic2any({
-            blob: file,
-            toType: "image/jpeg",
-            quality: 0.9,
-          });
-
-          // handle Blob or Blob[]
-          const blob = Array.isArray(result) ? result[0] : result;
-
-          uploadFile = new File(
-            [blob],
-            file.name.replace(/\.heic$/i, ".jpg"),
-            { type: "image/jpeg" }
-          );
-
+          uploadFile = await convertHEIC(file);
           console.log(`Converted ${file.name} → ${uploadFile.name}`);
         } catch (err) {
           console.error("HEIC conversion failed:", err);
@@ -78,6 +80,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
       alert("Upload failed! Check console for details.");
     }
   };
+
 
   // --- Modified bulk detect handler with model selection ---
   const handleBulkDetect = async () => {
