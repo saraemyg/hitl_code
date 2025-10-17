@@ -137,7 +137,7 @@ const SummaryPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow p-4 flex flex-col items-center justify-center">
             <div className="bg-white rounded-lg shadow p-4 aspect-[4/3] flex items-center justify-center">
               <img
-                src="/public/all_classes_palette.png"
+                src="/all_classes_palette.png"
                 alt="All Classes Palette"
                 className="w-full h-full object-cover rounded"
               />
@@ -216,13 +216,116 @@ const SummaryPage: React.FC = () => {
                     </span>
                   )}
                 </div>
+                
+                {/* Pagination controls */}
+                {sortedImgs.length > perPage && (() => {
+                  const totalPages = Math.ceil(sortedImgs.length / perPage);
+
+                  return (
+                    <div className="flex justify-between items-center text-xs text-gray-600 mt-2"
+                    onClick={(e) => e.stopPropagation()}>
+                      {/* Left side: First + Prev */}
+                      <div className="flex space-x-2">
+                        <button
+                          disabled={page === 0}
+                          onClick={() =>
+                            setPageIndex((prev) => ({ ...prev, [prefix]: 0 }))
+                          }
+                          className={`px-2 py-1 rounded ${
+                            page === 0
+                              ? "bg-gray-200 cursor-not-allowed"
+                              : "bg-gray-100 hover:bg-gray-200"
+                          }`}
+                        >
+                          First
+                        </button>
+
+                        <button
+                          disabled={page === 0}
+                          onClick={() =>
+                            setPageIndex((prev) => ({
+                              ...prev,
+                              [prefix]: Math.max((prev[prefix] || 0) - 1, 0),
+                            }))
+                          }
+                          className={`px-2 py-1 rounded ${
+                            page === 0
+                              ? "bg-gray-200 cursor-not-allowed"
+                              : "bg-gray-100 hover:bg-gray-200"
+                          }`}
+                        >
+                          Prev
+                        </button>
+                      </div>
+
+                      {/* Middle: dots indicator (max 5) */}
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(10, totalPages) }, (_, i) => {
+                          // Calculate window of pages
+                          let start = Math.max(
+                            0,
+                            Math.min(page - 2, totalPages - 10)
+                          );
+                          const dotPage = start + i;
+
+                          return (
+                            <span
+                              key={i}
+                              className={`w-2 h-2 rounded-full ${
+                                dotPage === page ? "bg-blue-500" : "bg-gray-300"
+                              }`}
+                            ></span>
+                          );
+                        })}
+                      </div>
+
+                      {/* Right side: Next + Last */}
+                      <div className="flex space-x-2">
+                        <button
+                          disabled={page >= totalPages - 1}
+                          onClick={(e) =>
+                            setPageIndex((prev) => ({
+                              ...prev,
+                              [prefix]: (prev[prefix] || 0) + 1,
+                            }))
+                          }
+                          className={`px-2 py-1 rounded ${
+                            page >= totalPages - 1
+                              ? "bg-gray-200 cursor-not-allowed"
+                              : "bg-gray-100 hover:bg-gray-200"
+                          }`}
+                        >
+                          Next
+                        </button>
+
+                        <button
+                          disabled={page >= totalPages - 1}
+                          onClick={() =>
+                            setPageIndex((prev) => ({
+                              ...prev,
+                              [prefix]: totalPages - 1,
+                            }))
+                          }
+                          className={`px-2 py-1 rounded ${
+                            page >= totalPages - 1
+                              ? "bg-gray-200 cursor-not-allowed"
+                              : "bg-gray-100 hover:bg-gray-200"
+                          }`}
+                        >
+                          Last
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+                
               </div>
             );
           })}
         </div>
       </section>
 
-      {/* 🌿 Blurred Overlay */}
+      {/* Blurred Overlay */}
       <AnimatePresence>
         {activeClass && (
           <motion.div
@@ -237,7 +340,7 @@ const SummaryPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* 🌿 Resizable Slide-in Panel */}
+      {/* Resizable Slide-in Panel */}
       <AnimatePresence>
         {activeClass && (
           <motion.div

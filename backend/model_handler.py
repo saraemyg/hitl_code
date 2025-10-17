@@ -1,31 +1,88 @@
-import logging
 import os
-from ultralytics import YOLO
+import logging
+import torch
 import numpy as np
 import cv2
+from ultralytics import YOLO
+from PIL import Image
+from transformers import AutoImageProcessor, ViTForImageClassification
+from torch.serialization import add_safe_globals
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 class PlantDefectDetector:
-    def __init__(self, model_path: str, base_dir: str = "data", version: str = "detection_v1"):
-        self.model_path = model_path
-        self.model = None 
+    def __init__(
+        self,
+        defect_model_path: str,
+        vit_model_path: str = None,
+        base_dir: str = "data",
+        version: str = "detection_v1"
+    ):
+        self.defect_model_path = defect_model_path
+        self.vit_model_path = vit_model_path
+        self.base_dir = base_dir
+        self.version = version
+
+        project_root = Path(__file__).resolve().parent.parent  
+        self.public_data_dir = project_root / "public" / base_dir
+        self.crop_dir = self.public_data_dir / version / "crops"
+        os.makedirs(self.crop_dir, exist_ok=True)
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # --- ViT Config ---
+        self.vit_base = "google/vit-base-patch16-224"
+        self.class_names = ["CSBL", "KBSC", "LBSS", "MBBC", "MGMZ", "RSLD"]
+        self.plant_labels = {
+            "CSBL": "Bright Lights Swiss Chard",
+            "KBSC": "Blue Scotch Kale",
+            "LBSS": "Lettuce Black Seeded Simpson",
+            "MBBC": "Baby Bok Choy",
+            "MGMZ": "Green Mizuna",
+            "RSLD": "Rocket Arugula",
+        }
+
+        self.defect_model = None
+        self.vit_model = None
+        self.processor = None
         self.is_loaded = False
 
-        # Folder structure
-        self.version = version
-        self.base_dir = base_dir
-        self.crop_dir = os.path.join(base_dir, version, "crops")
-        os.makedirs(self.crop_dir, exist_ok=True)
     
-    def load_model(self):
+    def load_models(self):
         try:
-            logger.info(f"Loading model from {self.model_path}")
-            self.model = YOLO(self.model_path)
+            logger.info(f"Loading YOLO model from {self.defect_model_path}")
+            self.defect_model = YOLO(self.defect_model_path)
+
+            if self.vit_model_path:
+                logger.info(f"Loading ViT model from {self.vit_model_path}")
+                self.processor = AutoImageProcessor.from_pretrained(self.vit_base)
+
+                try:
+                    from transformers.models.vit.modeling_vit import ViTForImageClassification
+                    add_safe_globals([ViTForImageClassification])
+                    self.vit_model = torch.load(
+                        self.vit_model_path, map_location=self.device, weights_only=False
+                    )
+                    logger.info("✅ ViT model loaded successfully (full model).")
+                except Exception as e:
+                    logger.warning(f"⚠️ Full ViT model load failed: {e}")
+                    logger.info("Attempting state_dict load...")
+                    self.vit_model = ViTForImageClassification.from_pretrained(
+                        self.vit_base, num_labels=len(self.class_names)
+                    )
+                    state_dict = torch.load(
+                        self.vit_model_path, map_location=self.device, weights_only=True
+                    )
+                    self.vit_model.load_state_dict(state_dict)
+                    logger.info("✅ ViT weights loaded successfully.")
+
+                self.vit_model.to(self.device).eval()
+
             self.is_loaded = True
-            logger.info("Model loaded successfully")
+            logger.info("All models loaded successfully.")
         except Exception as e:
-            logger.error(f"Failed to load model: {e}")
+            logger.error(f"❌ Model loading failed: {e}")
             raise
 
     def _iou(self, boxA, boxB):
@@ -44,7 +101,6 @@ class PlantDefectDetector:
         unionArea = boxAArea + boxBArea - interArea
 
         return interArea / unionArea if unionArea > 0 else 0
-
 
     def crop_handler(self, image_bgr, x1, y1, x2, y2, defect_id, defect_type, padding=100, make_square=True):
         #Handles cropping, padding, and saving defect crop 
@@ -89,15 +145,45 @@ class PlantDefectDetector:
         cv2.imwrite(save_path, crop)
 
         # relative path for metadata (URL-safe)
-        rel_path = os.path.relpath(save_path, "data")
-        return rel_path.replace("\\", "/")  # forward slashes
+        rel_path = os.path.relpath(save_path, self.public_data_dir)
+        return rel_path.replace(os.sep, "/")
 
+    # ViT Plant Prediction
+    def _predict_plant_type(self, image_bgr):
+        if not self.vit_model:
+            logger.warning("⚠️ ViT model not loaded — skipping classification.")
+            return {"code": None, "confidence": None}
+
+        try:
+            pil_img = Image.fromarray(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
+            inputs = self.processor(images=pil_img, return_tensors="pt").to(self.device)
+
+            with torch.no_grad():
+                outputs = self.vit_model(**inputs)
+                probs = torch.nn.functional.softmax(outputs.logits, dim=1)
+                conf, pred = torch.max(probs, dim=1)
+            code = self.class_names[pred.item()]   # e.g., "MBBC"
+            readable_label = self.plant_labels.get(code, code)  # e.g., "Baby Bok Choy"
+
+            logger.info(f"🌿 ViT predicted: {readable_label} ({conf.item() * 100:.2f}%)")
+
+            return {
+                "code": code,   # e.g., "MBBC"
+                "label": readable_label,  # "Baby Bok Choy"
+                "conf": round(conf.item() * 100, 2)
+            }
+
+        except Exception as e:
+            logger.error(f"❌ ViT prediction failed: {e}")
+            return {"code": None, "confidence": None}
+
+    # YOLO + ViT Inference
     def predict(self, image: np.ndarray, return_image: bool, conf_threshold: float = 0.05):
         if not self.is_loaded:
             raise Exception("Model not loaded")
 
         image_bgr = image[..., ::-1] # Convert RGB → BGR for OpenCV
-        results = self.model(image_bgr, conf=conf_threshold)
+        results = self.defect_model(image_bgr, conf=conf_threshold)
 
         detections = []
         annotated_image = None
@@ -117,12 +203,11 @@ class PlantDefectDetector:
                     for d in detections:
                         if d["type"] == defect_type:
                             iou = self._iou(bbox, d["bbox"])
-                            if iou >= 0.8:
+                            if iou >= 0.5:
                                 skip = True
                                 break
                     if skip:
                         continue
-
 
                     # Call crop_handler
                     crop_path = self.crop_handler(
@@ -147,5 +232,13 @@ class PlantDefectDetector:
                     boxes=True,
                     line_width=5
                 )
+
+        plant_type = self._predict_plant_type(image_bgr)
+
+        metadata = {
+            "detections": detections,
+            "version": self.version,
+            "plant_type": plant_type
+        }
         
-        return (detections, annotated_image) if return_image else detections
+        return (metadata, annotated_image) if return_image else metadata

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Download, Trash2 } from 'lucide-react';
+import ConfirmModal from "../components/ConfirmModal";
 
 // Add available models
 const AVAILABLE_MODELS = [
@@ -21,6 +22,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   const [isDetecting, setIsDetecting] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState("");
+  const controllerRef = useRef(null);
 
   // --- Lazy import HEIC conversion only in browser ---
   const convertHEIC = async (file: File) => {
@@ -88,12 +92,16 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
 
   // --- bulk detect handler with model selection ---
   const handleBulkDetect = async () => {
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
     try {
       setIsDetecting(true);
       const response = await fetch(`${getApiBase()}/bulk-detect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json',},
-        body: JSON.stringify({ model: selectedModel })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: selectedModel }),
+        signal: controller.signal, // attach abort signal
       });
 
       const result = await response.json();
@@ -102,10 +110,24 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
       alert(`Processed ${result.processed} images!`);
       window.location.reload();
     } catch (error) {
-      console.error("Detection failed", error);
-      alert("Detection failed!");
+      if (error.name === "AbortError") {
+        console.warn("Detection cancelled by user.");
+        setCancelMessage("The detection process was cancelled before completion.");
+        setShowCancelModal(true);
+      } else {
+        console.error("Detection failed", error);
+        setCancelMessage("Detection failed due to an unexpected error.");
+        setShowCancelModal(true);
+      }
     } finally {
       setIsDetecting(false);
+      controllerRef.current = null;
+    }
+  };
+
+  const handleCancelDetect = () => {
+    if (controllerRef.current) {
+      controllerRef.current.abort();
     }
   };
 
@@ -155,7 +177,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
     }
   };
 
-  // --- Clear folder with confirmation ---
+  // --- Clear folder with confirmation --- > change to use ComfirmModal later ya!
   const clearFolder = async (folderType: string) => {
     // Show confirmation dialog
     const confirmed = window.confirm(`Are you sure you want to clear all ${folderType} images? This action cannot be undone.`);
@@ -181,37 +203,56 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
   // Spinner / Loading Overlay
   if (isDetecting || isConverting) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-        <div className="relative bg-white rounded-2xl shadow-2xl p-10 max-w-lg w-full text-center">
-          {/* Spinner circle */}
-          <div className="relative flex items-center justify-center mb-6">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-green-500 border-opacity-70"></div>
-            <span className="absolute text-lg font-semibold text-gray-700">
-              {progress}%
-            </span>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="relative bg-white rounded-3xl shadow-2xl p-10 max-w-md w-full text-center border border-gray-200">
+          
+          {/* Animated ring spinner */}
+          <div className="relative flex items-center justify-center mb-8">
+            <div className="relative h-24 w-24">
+              <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
+              <div className="absolute inset-4 rounded-full bg-blue-100 animate-ping"></div>
+              <div className="absolute inset-8 rounded-full bg-green-200 shadow-lg shadow-blue-400 animate-pulse flex items-center justify-center">
+                <span className="text-3xl animate-bounce-slow">🤖</span>
+              </div>
+            </div>
           </div>
 
           {/* Title */}
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">
-            {isDetecting
-              ? "Running Bulk Detection..."
-              : "Converting to YOLOv11 Format..."}
+          <h2 className="text-2xl font-bold text-gray-700 mb-2">
+            {isDetecting ? "Running Bulk Detection" : "Converting Dataset..."}
           </h2>
 
           {/* Description */}
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-500 text-sm mb-6">
             {isDetecting
-              ? `Processing images... (${progress})`
-              : "Please wait while dataset is being converted."}
+              ? "Analyzing, detecting & classifying your plant images..."
+              : "Reformatting dataset to YOLOv11 structure..."}
           </p>
 
-          {/* Progress bar */}
-          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+          {/* Loading bar */}
+          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
             <div
-              className="bg-green-500 h-3 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
+              className="h-full bg-gradient-to-r from-green-200 to-blue-300 animate-progress"
+              style={{
+                width: `${progress || 100}%`,
+                transition: "width 0.3s ease-in-out",
+              }}
             ></div>
           </div>
+
+          {isDetecting && (
+            <button
+              onClick={() => {
+                if (window.confirm("Cancel ongoing detection?")) {
+                  controllerRef.current?.abort(); // stop fetch
+                  setIsDetecting(false);
+                }
+              }}
+              className="mt-2 px-3 py-1 text-xs text-gray-500 hover:text-red-500 transition-colors"
+            >
+              Cancel Detection
+            </button>
+          )}
         </div>
       </div>
     );
@@ -233,7 +274,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
         {/* Upload */}
         <div className="flex items-center">
           <button
-            className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-400"
             onClick={() => fileInputRef.current?.click()}
           >
             Upload Image
@@ -270,11 +311,34 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, tot
           </select>
           
           <button
-            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
             onClick={handleBulkDetect}
+            disabled={isDetecting}
+            className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-400"
           >
-            Run Detection
+            {isDetecting ? "Detecting..." : "Run Bulk Detection"}
           </button>
+
+          {/* Optional cancel button */}
+          {isDetecting && (
+            <button
+              onClick={handleCancelDetect}
+              className="ml-4 px-6 py-3 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600"
+            >
+              Cancel Detection
+            </button>
+          )}
+
+          {/* Cancel/Failure Confirmation Modal */}
+          <ConfirmModal
+            open={showCancelModal}
+            title="Detection Notice"
+            message={cancelMessage}
+            confirmText="OK"
+            cancelText="Close"
+            onConfirm={() => setShowCancelModal(false)}
+            onCancel={() => setShowCancelModal(false)}
+          />
+
           <button
             className="p-2 bg-red-100 rounded hover:bg-red-200"
             onClick={() => clearFolder("processed")}

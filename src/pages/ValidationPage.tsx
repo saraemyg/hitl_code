@@ -298,10 +298,31 @@ export const ValidationPage: React.FC = () => {
           <div className="parent grid grid-cols-10 grid-rows-10 gap-1 h-screen overflow-hidden">
             {/* Full Image */}
             <div className="div1 col-start-1 col-end-7 row-start-1 row-end-6 bg-white rounded-lg shadow p-2 flex flex-col">
-              <h3 className="text-sm font-semibold text-gray-800 mb-2">Full Image</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-gray-800">Full Image</h3>
+
+                {/* Plant Info Display */}
+                <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-md shadow-sm text-xs text-gray-800">
+                  <span className="font-semibold text-green-700">
+                    [{currentImage?.plant_type?.code || "—"}]
+                  </span>
+                  <span className="text-gray-400">:</span>
+                  <span className="italic font-medium">
+                    {currentImage?.plant_type?.label || "Unknown Plant"}
+                  </span>
+
+                  {typeof currentImage?.plant_type?.conf === "number" && (
+                    <span className="text-gray-500 ml-2">
+                      ({(currentImage.plant_type.conf).toFixed(2)}%)
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <div className="flex-1 overflow-hidden">
-                <ImageViewer imageSrc={currentImage?.processed_img || PLACEHOLDER_IMAGE.path} 
-                zoomable={true} // enable zoom + slider + keyboard control
+                <ImageViewer
+                  imageSrc={currentImage?.processed_img || PLACEHOLDER_IMAGE.path}
+                  zoomable={true} // enable zoom + slider + keyboard control
                 />
               </div>
             </div>

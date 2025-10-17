@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from bson import ObjectId
 from contextlib import asynccontextmanager
 from pymongo import MongoClient, errors, ASCENDING
 from dotenv import load_dotenv
@@ -19,6 +20,7 @@ import numpy as np
 from PIL import Image
 from datetime import datetime
 from typing import List
+import traceback
 
 from model_handler import PlantDefectDetector # from yolo_converter import convert_to_yolov11
 
@@ -44,16 +46,19 @@ images.create_index([("image_id", ASCENDING)])
 images.create_index([("created_at", ASCENDING)])
 
 # Model Initialisation * optimise this later for multiple model selection
-detector = PlantDefectDetector("models/HQx1280.pt")
+DEFECT_MODEL_PATH = os.getenv("DEFECT_MODEL_PATH", "models/HQx1280.pt")
+VIT_MODEL_PATH = os.getenv("VIT_MODEL_PATH", None)
+detector = PlantDefectDetector(DEFECT_MODEL_PATH, VIT_MODEL_PATH)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Loading model from startup...")
     start_time = time.time()
     try: 
-        detector.load_model()
+        detector.load_models()
         elapsed = time.time() - start_time
-        logger.info(f"Model {detector.model_path} successfully loaded in {elapsed:.2f} seconds")
+        logger.info(f"Models loaded successfully from {detector.defect_model_path} "
+            f"{'(+ ViT)' if detector.vit_model_path else ''} in {elapsed:.2f} seconds")
     except Exception as e:
         logger.error(f"Error loading model: {e}")
         raise
@@ -97,7 +102,7 @@ else:
 
 @app.get("/metadata")
 async def get_metadata(file: str = Query(default=default_metadata_file, description="Metadata file path")):
-    """Fetch metadata from MongoDB if available, else JSON fallback"""
+    # Fetch metadata from MongoDB if available, else JSON fallback
     try:
         client.admin.command("ping")  # test Mongo
         print("[Mongo] Fetching metadata from Atlas")
@@ -162,9 +167,11 @@ def load_metadata(file: str = default_metadata_file):
             for det in item.get("detections", []):
                 crop_path = det.get("crop")
                 if crop_path:
-                    fs_path = os.path.join("data", crop_path.replace("\\", "/"))
+                    fs_path = (DATA_ROOT / crop_path).resolve()
                     if os.path.exists(fs_path):
                         valid_detections.append(det)
+                    else:
+                        print(f"[Missing Crop] {fs_path} not found, skipping.")
             item["detections"] = valid_detections
             cleaned_metadata.append(item)
         return cleaned_metadata
@@ -323,6 +330,14 @@ async def delete_detection(body: dict = Body(...)):
     raise HTTPException(status_code=404, detail=f"Detection not found for {req_path}")
 
 # Detection Pipeline --------------------------------------------
+def convert_objectid(obj):
+    if isinstance(obj, ObjectId):
+        return str(obj)
+    if isinstance(obj, list):
+        return [convert_objectid(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: convert_objectid(v) for k, v in obj.items()}
+    return obj
 
 @app.post("/bulk-detect")
 async def bulk_detect(request_data: dict):
@@ -330,67 +345,139 @@ async def bulk_detect(request_data: dict):
     os.makedirs(processed_dir, exist_ok=True)
     os.makedirs(crops_dir, exist_ok=True)
 
-    # Load existing metadata
+    logger.info(f"Starting bulk detection (model={model_name}) using version={DETECTION_VERSION}")
+
+    # --- Load existing metadata for preserving validation statuses ---
+    existing_metadata = {}
     if os.path.exists(default_metadata_file):
-        with open(default_metadata_file, "r") as f:
-            existing_metadata = {item["uploaded_img"]: item for item in json.load(f)}
-    else:
-        existing_metadata = {}
+        try:
+            with open(default_metadata_file, "r", encoding="utf-8") as f:
+                file_data = json.load(f)
+            for item in file_data:
+                key = os.path.basename(item.get("uploaded_img", ""))
+                if key:
+                    existing_metadata[key] = item
+        except Exception as e:
+            logger.warning(f"Could not load existing metadata file: {e}")
+
+    # --- Collect all images to process ---
+    image_files = [
+        f for f in os.listdir(original_dir)
+        if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+    ]
 
     results = []
-    image_files = [f for f in os.listdir(original_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
 
     for image_file in image_files:
         file_path = os.path.join(original_dir, image_file)
         try:
-            image = Image.open(file_path)
-            if image.mode != 'RGB':
-                image = image.convert('RGB')
-            image_array = np.array(image)
+            image_pil = Image.open(file_path)
+            if image_pil.mode != "RGB":
+                image_pil = image_pil.convert("RGB")
+            image_array = np.array(image_pil)
 
-            detections, annotated_image = detector.predict(image_array, return_image=True)
+            # --- Perform inference using detector (YOLO + ViT) ---
+            metadata, annotated_image = detector.predict(image_array, return_image=True)
 
+            # --- Save annotated image ---
             annotated_filename = f"{os.path.splitext(image_file)[0]}_processed.jpg"
             annotated_path = os.path.join(processed_dir, annotated_filename)
+            try:
+                ann_arr = np.asarray(annotated_image)
+                # Convert to RGB if detector returns BGR
+                annotated_pil = Image.fromarray(ann_arr[..., ::-1])
+                annotated_pil.save(annotated_path, quality=95)
+            except Exception as e:
+                logger.warning(f"Could not save annotated image for {image_file}: {e}")
 
-            if annotated_image is not None:
-                annotated_rgb = annotated_image[..., ::-1]
-                annotated_pil = Image.fromarray(annotated_rgb)
-                annotated_pil.save(annotated_path)
+            # --- Normalize plant type ---
+            plant_pred = metadata.get("plant_type")
+            plant_type_out = None
+            if plant_pred:
+                code = plant_pred.get("code")
+                conf_val = plant_pred.get("confidence") or plant_pred.get("conf")
+                if conf_val is not None:
+                    if 0.0 <= conf_val <= 1.0:
+                        conf_out = round(conf_val * 100, 2)
+                    else:
+                        conf_out = round(float(conf_val), 2)
+                else:
+                    conf_out = None
+                plant_type_out = {"code": code, "conf": conf_out}
 
-            new_entry = { # always forward slashes → works cross-platform
+            # --- Normalize detections ---
+            detections_out = []
+            for d in metadata.get("detections", []):
+                conf = d.get("conf") or d.get("confidence") or d.get("score")
+                bbox = d.get("bbox")
+                if bbox:
+                    bbox = [float(x) for x in bbox]
+                detections_out.append({
+                    "id": int(d.get("id", -1)),
+                    "type": d.get("type"),
+                    "conf": float(round(conf, 4)) if conf is not None else None,
+                    "bbox": bbox,
+                    "status": d.get("status", "unvalidated"),
+                    "crop": d.get("crop")
+                })
+
+            # --- Build metadata entry consistent with your schema ---
+            new_entry = {
                 "uploaded_img": os.path.join(DETECTION_VERSION, "original_img", image_file).replace("\\", "/"),
                 "processed_img": os.path.join(DETECTION_VERSION, "processed_img", annotated_filename).replace("\\", "/"),
-                "detections": detections,
-                "defect_count": len(detections),
+                "plant_type": plant_type_out,
+                "detections": detections_out,
                 "version": DETECTION_VERSION
             }
 
-            # Preserve old statuses
-            if image_file in existing_metadata:
-                old_entry = existing_metadata[image_file]
-                old_detections = {d["defect_id"]: d for d in old_entry.get("detections", [])}
+            # --- Preserve previous statuses ---
+            existing = existing_metadata.get(image_file)
+            if existing:
+                old_dets = {
+                    int(d.get("id", -1)): d
+                    for d in existing.get("detections", [])
+                }
                 for det in new_entry["detections"]:
-                    if det["defect_id"] in old_detections:
-                        det["status"] = old_detections[det["defect_id"]].get("status", "unvalidated")
+                    old = old_dets.get(det["id"])
+                    if old and "status" in old:
+                        det["status"] = old.get("status", det["status"])
 
             results.append(new_entry)
 
+            # --- Upsert to MongoDB ---
+            try:
+                images.replace_one(
+                    {"uploaded_img": new_entry["uploaded_img"]},
+                    new_entry,
+                    upsert=True
+                )
+            except Exception as e:
+                logger.warning(f"MongoDB upsert failed for {image_file}: {e}")
+
         except Exception as e:
-            logger.error(f"Failed to process {image_file}: {e}")
+            tb = traceback.format_exc()
+            logger.error(f"Failed to process {image_file}: {e}\n{tb}")
             results.append({
-                "uploaded_img": image_file,
+                "uploaded_img": os.path.join(DETECTION_VERSION, "original_img", image_file).replace("\\", "/"),
                 "error": str(e)
             })
 
-    save_metadata(results)
-    logger.info(f"Metadata saved to: {default_metadata_file}")
+    # --- Save fallback JSON for static use ---
+    try:
+        save_metadata(results)
+        logger.info(f"Metadata saved to: {default_metadata_file}")
+    except Exception as e:
+        logger.warning(f"Failed to save metadata file: {e}")
 
-    return {
+    # --- Response ---
+    payload = {
         "success": True,
         "processed": len(results),
         "results": results
     }
+
+    return JSONResponse(content=convert_objectid(payload))
+
 
 @app.post("/upload-images")
 async def upload_images(files: List[UploadFile] = File(...)):

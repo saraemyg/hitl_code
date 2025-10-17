@@ -15,7 +15,17 @@ const getApiBase = () => {
 export const fetchDetectionMetadata = async (
   selectedMetadata?: string // optional, fallback to default inside
 ): Promise<ImageData[]> => {
-  const API_BASE = getApiBase(); // <-- safe here
+  const API_BASE = getApiBase();
+
+  // --- Plant label lookup 
+  const PLANT_LABELS: Record<string, string> = {
+    CSBL: "Bright Lights Swiss Chard",
+    KBSC: "Blue Scotch Kale",
+    LBSS: "Lettuce Black Seeded Simpson",
+    MBBC: "Baby Bok Choy",
+    MGMZ: "Green Mizuna",
+    RSLD: "Rocket Arugula",
+  };
 
   const metadataFile = selectedMetadata
     ? `data/${selectedMetadata}`
@@ -36,21 +46,36 @@ export const fetchDetectionMetadata = async (
 
   const metadata = await response.json();
 
-  return metadata.map((item: any) => ({
-    uploaded_img: `${API_BASE}/${item.uploaded_img}`,
-    processed_img: `${API_BASE}/${item.processed_img}`,
-    defect_count: item.defect_count,
-    detections: item.detections.map((det: any) => ({
-      id: det.id,
-      type: det.type,
-      conf: parseFloat(det.conf),
-      bbox: det.bbox,
-      status: det.status,
-      crop: det.crop ? `${API_BASE}/${det.crop}` : null,
-      validated: det.status !== "unvalidated",
-      validatedAs: det.status === "unvalidated" ? undefined : det.status,
-    })),
-  }));
+  // --- Normalize + enrich data for UI ---
+  return metadata.map((item: any) => {
+    const plantType = item.plant_type || {};
+    const code = plantType.code || null;
+    const conf = plantType.conf || null;
+
+    // If code exists, show readable label
+    const readableLabel = code && PLANT_LABELS[code] ? PLANT_LABELS[code] : code;
+
+    return {
+      uploaded_img: `${API_BASE}/${item.uploaded_img}`,
+      processed_img: `${API_BASE}/${item.processed_img}`,
+      defect_count: item.defect_count,
+      plant_type: {
+        code,                    // stored code (MBBC, etc.)
+        label: readableLabel,    // UI label (Baby Bok Choy)
+        conf,                    // confidence from ViT
+      },
+      detections: item.detections.map((det: any) => ({
+        id: det.id,
+        type: det.type,
+        conf: parseFloat(det.conf),
+        bbox: det.bbox,
+        status: det.status,
+        crop: det.crop ? `${API_BASE}/${det.crop}` : null,
+        validated: det.status !== "unvalidated",
+        validatedAs: det.status === "unvalidated" ? undefined : det.status,
+      })),
+    };
+  });
 };
 
 // Filter type
@@ -112,7 +137,6 @@ export const useDetectionData = () => {
   };
 
   // Metadata ------------------------------------------------
-    // ✅ Unified reload
   const reloadMetadata = async () => {
     setLoading(true);
     setError(null);

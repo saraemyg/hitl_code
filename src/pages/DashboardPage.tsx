@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, Line, ComposedChart } from "recharts";
-import { Detection, DEFECT_CLASSES } from "../types";
+import { Detection, DEFECT_CLASSES, ImageData } from "../types";
 import { useDetectionData } from "../hooks/useDetectionData";
 
 // Interfaces
-
 interface PieLabel {
   name: string;
   percent: number;
@@ -30,10 +29,10 @@ const STATUS_COLORS: Record<string, string> = {
 
 const DashboardPage: React.FC = () => {
   const { data, loading, error } = useDetectionData(); // unified data fetch
-  const [selectedData, setSelectedData] = useState<"defect" | "status">("defect");
+  const [selectedData, setSelectedData] = useState<"defect" | "status" | "plant">("defect");
 
   // Compute aggregated data only once when `data` changes
-  const { defectCounts, validationStatus } = useMemo(() => {
+  const { defectCounts, validationStatus, plantTypeCounts } = useMemo(() => {
     const typeCount: Record<string, number> = {};
     const typeConfidence: Record<string, number[]> = {};
     const statusCount: Record<string, number> = {
@@ -42,12 +41,20 @@ const DashboardPage: React.FC = () => {
       healthy: 0,
       uncertain: 0,
     };
+    const plantCount: Record<string, { count: number; confs: number[] }> = {};
 
-    data.forEach((item: any) => {
+    data.forEach((item: ImageData) => {
+      // Aggregate Plant Type
+      const plantLabel = item.plant_type?.label || "Unknown";
+      const plantConf = item.plant_type?.conf || 0;
+
+      if (!plantCount[plantLabel]) plantCount[plantLabel] = { count: 0, confs: [] };
+      plantCount[plantLabel].count += 1;
+      plantCount[plantLabel].confs.push(plantConf);
+
+      // Aggregate detections
       item.detections.forEach((det: Detection) => {
         typeCount[det.type] = (typeCount[det.type] || 0) + 1;
-
-        // Track confidences for each defect type
         if (!typeConfidence[det.type]) typeConfidence[det.type] = [];
         typeConfidence[det.type].push(det.conf);
 
@@ -58,27 +65,29 @@ const DashboardPage: React.FC = () => {
       });
     });
 
-  // Compute average confidence per defect type
-  const sortedDefects = Object.entries(typeCount)
-    .map(([name, value]) => {
+    // Prepare sorted defect counts with average confidence
+    const sortedDefects = Object.entries(typeCount).map(([name, value]) => {
       const confs = typeConfidence[name] || [];
-      const avgConfidence =
-        confs.length > 0
-          ? confs.reduce((sum, c) => sum + c, 0) / confs.length
-          : 0;
+      const avgConfidence = confs.length ? confs.reduce((a, b) => a + b, 0) / confs.length : 0;
       return { name, value, avgConfidence };
-    })
-    .sort((a, b) => b.value - a.value);
+    }).sort((a, b) => b.value - a.value);
 
-  const sortedStatus = Object.entries(statusCount)
-    .map(([name, value]) => ({
+    // Sorted validation status
+    const sortedStatus = Object.entries(statusCount).map(([name, value]) => ({
       name: name.charAt(0).toUpperCase() + name.slice(1),
       value,
-    }))
-    .sort((a, b) => b.value - a.value);
+    })).sort((a, b) => b.value - a.value);
 
-  return { defectCounts: sortedDefects, validationStatus: sortedStatus };
-}, [data]);
+    // Sorted plant type counts with average confidence
+    const sortedPlants = Object.entries(plantCount).map(([name, { count, confs }]) => ({
+      name,
+      value: count,
+      avgConfidence: confs.length ? confs.reduce((a, b) => a + b, 0) / confs.length : 0,
+    })).sort((a, b) => b.value - a.value);
+
+    return { defectCounts: sortedDefects, validationStatus: sortedStatus, plantTypeCounts: sortedPlants };
+  }, [data]);
+
 
   const DEFECT_COLORS: Record<string, string> = useMemo(() => {
     return DEFECT_CLASSES.reduce((acc, cls, i) => {
@@ -118,6 +127,7 @@ const DashboardPage: React.FC = () => {
         >
           <option value="defect">Defect Types</option>
           <option value="status">Validation Status</option>
+          <option value="plant">Plant Types</option>
         </select>
       </div>
 

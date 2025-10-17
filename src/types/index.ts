@@ -2,7 +2,15 @@ export interface ImageData {
   uploaded_img: string;
   processed_img: string;
   detections: Detection[];
-  defect_count: number;
+  version: string;
+  plant_type?: PlantType;
+  defect_count?: number
+}
+
+export interface PlantType {
+  code: string | null;
+  label: string | null;
+  conf: number | null;
 }
 
 export interface Detection {
