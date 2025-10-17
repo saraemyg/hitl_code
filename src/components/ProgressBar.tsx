@@ -1,14 +1,14 @@
-import React, { useRef, useState } from "react";
-import { Download, Trash2 } from "lucide-react";
+import React, { useRef, useState } from 'react';
+import { Download, Trash2 } from 'lucide-react';
 
 // Add available models
 const AVAILABLE_MODELS = [
-  { id: "HQx1280", name: "High Quality 1280px" },
-  { id: "modelv4_l_0.2", name: "Model v4 Large" },
+  { id: 'HQx1280', name: 'High Quality 1280px' },
+  { id: 'modelv4_l_0.2', name: 'Model v4 Large' }
 ];
 
 // Helper function to get API base URL (for Vite)
-const getApiBase = () => import.meta.env.VITE_API_URL || "http://localhost:8000";
+const getApiBase = () => { return import.meta.env.VITE_API_URL || "http://localhost:8000";};
 
 interface ProgressBarProps {
   progress: number;
@@ -16,19 +16,19 @@ interface ProgressBarProps {
   total: number;
 }
 
-export const ProgressBar: React.FC<ProgressBarProps> = ({
-  progress,
-  current,
-  total,
-}) => {
+export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, current, total }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
 
-  // --- Lazy import heic2any only in browser ---
+  // --- Lazy import HEIC conversion only in browser ---
   const convertHEIC = async (file: File) => {
-    const { default: heic2any } = await import("heic2any");
+    if (typeof window === "undefined") {
+      throw new Error("HEIC conversion is only available in the browser.");
+    }
+
+    const heic2any = (await import("heic2any")).default;
 
     const result = await heic2any({
       blob: file,
@@ -85,17 +85,20 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     }
   };
 
-  // --- Bulk detect handler ---
+
+  // --- bulk detect handler with model selection ---
   const handleBulkDetect = async () => {
     try {
       setIsDetecting(true);
       const response = await fetch(`${getApiBase()}/bulk-detect`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: selectedModel }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',},
+        body: JSON.stringify({ model: selectedModel })
       });
 
       const result = await response.json();
+      console.log(result);
+
       alert(`Processed ${result.processed} images!`);
       window.location.reload();
     } catch (error) {
@@ -111,10 +114,12 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     try {
       setIsConverting(true);
       const response = await fetch(`${getApiBase()}/convert-yolov11`, {
-        method: "POST",
+        method: 'POST',
       });
 
       const result = await response.json();
+      console.log(result);
+
       alert(`Conversion complete: ${result.output_path}`);
     } catch (error) {
       console.error("Conversion failed", error);
@@ -124,20 +129,25 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     }
   };
 
-  // --- Download annotations handler ---
+  // --- Download Yolov11 handler ---
   const handleDownloadAnnotations = async () => {
     try {
-      const response = await fetch(`${getApiBase()}/download-annotations`);
+      const response = await fetch(`${getApiBase()}/download-annotations`, {
+        method: 'GET',
+      });
+
       if (!response.ok) throw new Error("Failed to download annotations");
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
+
+      const link = document.createElement('a');
       link.href = url;
-      link.download = "annotations.zip";
+      link.download = 'annotations.zip';
       document.body.appendChild(link);
       link.click();
       link.remove();
+
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Download failed", error);
@@ -147,7 +157,10 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
   // --- Clear folder with confirmation ---
   const clearFolder = async (folderType: string) => {
-    if (!window.confirm(`Clear all ${folderType} images? This cannot be undone.`)) return;
+    // Show confirmation dialog
+    const confirmed = window.confirm(`Are you sure you want to clear all ${folderType} images? This action cannot be undone.`);
+    
+    if (!confirmed) return;
 
     try {
       const response = await fetch(`${getApiBase()}/clear-folder/${folderType}`, {
@@ -156,6 +169,8 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
       const data = await response.json();
       alert(data.message || "Folder cleared successfully!");
+      
+      // Optionally refresh the page
       window.location.reload();
     } catch (error) {
       console.error("Error clearing folder:", error);
@@ -163,26 +178,34 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     }
   };
 
-  // --- Loading Overlay ---
+  // Spinner / Loading Overlay
   if (isDetecting || isConverting) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
         <div className="relative bg-white rounded-2xl shadow-2xl p-10 max-w-lg w-full text-center">
+          {/* Spinner circle */}
           <div className="relative flex items-center justify-center mb-6">
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-green-500 border-opacity-70"></div>
-            <span className="absolute text-lg font-semibold text-gray-700">{progress}%</span>
+            <span className="absolute text-lg font-semibold text-gray-700">
+              {progress}%
+            </span>
           </div>
 
+          {/* Title */}
           <h2 className="text-2xl font-bold text-gray-800 mb-3">
-            {isDetecting ? "Running Bulk Detection..." : "Converting to YOLOv11 Format..."}
+            {isDetecting
+              ? "Running Bulk Detection..."
+              : "Converting to YOLOv11 Format..."}
           </h2>
 
+          {/* Description */}
           <p className="text-gray-600 mb-6">
             {isDetecting
               ? `Processing images... (${progress})`
               : "Please wait while dataset is being converted."}
           </p>
 
+          {/* Progress bar */}
           <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
             <div
               className="bg-green-500 h-3 rounded-full transition-all duration-300"
@@ -194,17 +217,16 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     );
   }
 
-  // --- Main UI ---
   return (
     <div className="w-full">
       <div className="bg-gray-200 rounded-full h-3 mb-4">
-        <div
+        <div 
           className="bg-gradient-to-r from-blue-500 to-red-500 h-3 rounded-full transition-all duration-300 ease-out"
           style={{ width: `${progress}%` }}
         />
       </div>
 
-      <div className="flex flex-wrap justify-between items-center text-sm text-gray-600 gap-3">
+      <div className="flex justify-between items-center text-sm text-gray-600 mt-2">
         <span>Progress: {current}/{total}</span>
         <span>{progress.toFixed(1)}% Complete</span>
 
@@ -229,24 +251,24 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
           accept="image/*"
           multiple
           ref={fileInputRef}
-          style={{ display: "none" }}
+          style={{ display: 'none' }}
           onChange={handleBulkUpload}
         />
 
-        {/* Model selector + detection */}
+        {/* Model selector and detection buttons */}
         <div className="flex items-center gap-2">
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
             className="px-2 py-1 border rounded bg-white"
           >
-            {AVAILABLE_MODELS.map((model) => (
+            {AVAILABLE_MODELS.map(model => (
               <option key={model.id} value={model.id}>
                 {model.name}
               </option>
             ))}
           </select>
-
+          
           <button
             className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
             onClick={handleBulkDetect}
