@@ -35,9 +35,3 @@ export const DEFECT_CLASSES = [
   'Wilting',
   'Yellowing'
 ];
-
-export interface ValidationResult {
-  detectionId: number;
-  decision: 'correct' | 'healthy' | 'other';
-  className?: string;
-}

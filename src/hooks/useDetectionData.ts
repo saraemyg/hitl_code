@@ -205,7 +205,7 @@ export const useDetectionData = () => {
   // Validation ----------------------------------------------
  
   const validateDetection = (
-    decision: "correct" | "healthy" | "other" | "uncertain",
+    decision: "correct" | "healthy" | "other" | "uncertain" | "plantType",
     className?: string
   ) => {
     const detection = getCurrentDetection();

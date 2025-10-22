@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, Line, ComposedChart } from "recharts";
+import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, Line, ComposedChart, Legend } from "recharts";
 import { Detection, DEFECT_CLASSES, ImageData } from "../types";
 import { useDetectionData } from "../hooks/useDetectionData";
 
@@ -83,11 +83,10 @@ const DashboardPage: React.FC = () => {
       name,
       value: count,
       avgConfidence: confs.length ? confs.reduce((a, b) => a + b, 0) / confs.length : 0,
-    })).sort((a, b) => b.value - a.value);
+    })).sort((a, b) => b.avgConfidence - a.avgConfidence);
 
     return { defectCounts: sortedDefects, validationStatus: sortedStatus, plantTypeCounts: sortedPlants };
   }, [data]);
-
 
   const DEFECT_COLORS: Record<string, string> = useMemo(() => {
     return DEFECT_CLASSES.reduce((acc, cls, i) => {
@@ -96,9 +95,12 @@ const DashboardPage: React.FC = () => {
     }, {} as Record<string, string>);
   }, []);
 
-  const chartData = selectedData === "defect" ? defectCounts : validationStatus;
-  const colorSource =
-    selectedData === "defect" ? DEFECT_COLORS : STATUS_COLORS;
+  const chartData =
+    selectedData === "defect"
+      ? defectCounts
+      : selectedData === "status"
+      ? validationStatus
+      : plantTypeCounts;
 
   if (loading) {
     return (
@@ -122,7 +124,7 @@ const DashboardPage: React.FC = () => {
         <h1 className="text-xl font-bold text-gray-800">Dashboard Overview</h1>
         <select
           value={selectedData}
-          onChange={(e) => setSelectedData(e.target.value as "defect" | "status")}
+          onChange={(e) => setSelectedData(e.target.value as "defect" | "status" | "plant")}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           <option value="defect">Defect Types</option>
@@ -130,6 +132,140 @@ const DashboardPage: React.FC = () => {
           <option value="plant">Plant Types</option>
         </select>
       </div>
+   
+    {/* Plant Type Visualizations Section */}
+    {selectedData === "plant" ? (
+      <div className="bg-white p-8 rounded-2xl shadow-lg mt-6 transition-transform duration-300 hover:scale-[1.01]">
+        <h2 className="text-lg font-semibold text-gray-800 mb-6 text-center">
+          🌿 Plant Type Defect Distribution (100% Stacked)
+        </h2>
+
+        <ResponsiveContainer width="100%" height={420}>
+          <BarChart
+            layout="vertical"
+            data={plantTypeCounts.map((p) => {
+              const defectCounts = Object.fromEntries(
+                DEFECT_CLASSES.map((cls) => [
+                  cls,
+                  data.filter(
+                    (img) =>
+                      img.plant_type?.label === p.name &&
+                      img.detections.some((d) => d.type === cls)
+                  ).length,
+                ])
+              );
+
+              const total = Object.values(defectCounts).reduce(
+                (a, b) => a + (b as number),
+                0
+              );
+
+              const normalized = Object.fromEntries(
+                Object.entries(defectCounts).map(([k, v]) => [
+                  k,
+                  total ? ((v as number) / total) * 100 : 0,
+                ])
+              );
+
+              return {
+                name: p.name,
+                avgConfidence: p.avgConfidence,
+                totalCount: total,
+                defectPercents: normalized,
+                ...normalized,
+              };
+            })}
+            margin={{ top: 20, right: 60, left: 120, bottom: 20 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+            <XAxis
+              type="number"
+              domain={[0, 100]}
+              tickFormatter={(v) => `${v.toFixed(0)}%`}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              tick={{ fontSize: 12, fill: "#374151" }}
+              width={100}
+            />
+            <Tooltip
+              content={({ active, payload, label }) => {
+                if (!active || !payload?.length) return null;
+                const plant = payload[0].payload;
+
+                return (
+                  <div
+                    className="rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm shadow-md p-3 transition-all duration-300"
+                    style={{ minWidth: 160 }}
+                  >
+                    <div className="font-semibold text-gray-800 text-sm mb-1">
+                      🪴 {label}
+                    </div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      Total Images: <span className="font-medium">{plant.totalCount}</span>
+                    </div>
+                    <div className="text-xs text-gray-600 mb-2">
+                      Avg Confidence:{" "}
+                      <span className="font-semibold">
+                        {plant.avgConfidence ? plant.avgConfidence.toFixed(2) : 0}%
+                      </span>
+                    </div>
+                    <div className="border-t border-gray-200 mt-1 pt-1">
+                      {DEFECT_CLASSES.map((cls, i) => {
+                        const val = plant.defectPercents?.[cls] ?? 0;
+                        return (
+                          <div
+                            key={cls}
+                            className="flex justify-between text-[11px] text-gray-700"
+                          >
+                            <span className="flex items-center gap-1">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full"
+                                style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                              ></span>
+                              {cls}
+                            </span>
+                            <span>{val.toFixed(1)}%</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }}
+            />
+
+            <Legend wrapperStyle={{ fontSize: "12px", marginTop: "10px" }} />
+
+            {/* Animated Vertical Gradient Bars */}
+            {DEFECT_CLASSES.map((cls, i) => (
+              <Bar
+                key={cls}
+                dataKey={cls}
+                stackId="a"
+                radius={i === DEFECT_CLASSES.length - 1 ? [0, 6, 6, 0] : [0, 0, 0, 0]}
+                fill={`url(#verticalGradient${i})`}
+                isAnimationActive={true}
+                animationBegin={150}
+                animationDuration={800}
+                animationEasing="ease-in-out"
+              />
+            ))}
+
+            {/* Vertical Gradients */}
+            <defs>
+              {DEFECT_CLASSES.map((_, i) => (
+                <linearGradient key={i} id={`verticalGradient${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0.95} />
+                  <stop offset="100%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0.55} />
+                </linearGradient>
+              ))}
+            </defs>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    ) : (
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
@@ -239,7 +375,7 @@ const DashboardPage: React.FC = () => {
         <h2 className="text-m font-semibold text-gray-700 mb-6 text-center">
           {selectedData === "defect"
             ? "Defect Frequency & Avg Confidence"
-            : "Validation Progress (Sorted)"}
+            : "Validation Progress"}
         </h2>
 
         <div className="w-full h-[420px] flex items-center justify-center">
@@ -421,6 +557,7 @@ const DashboardPage: React.FC = () => {
       </div>
 
       </div>
+      )}
     </div>
   );
 };

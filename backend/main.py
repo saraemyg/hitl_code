@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import List
 import traceback
 
-from model_handler import PlantDefectDetector # from yolo_converter import convert_to_yolov11
+from model_handler import PlantDefectDetector 
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -46,7 +46,7 @@ images.create_index([("image_id", ASCENDING)])
 images.create_index([("created_at", ASCENDING)])
 
 # Model Initialisation * optimise this later for multiple model selection
-DEFECT_MODEL_PATH = os.getenv("DEFECT_MODEL_PATH", "models/HQx1280.pt")
+DEFECT_MODEL_PATH = os.getenv("DEFECT_MODEL_PATH", "models/best0501.pt")
 VIT_MODEL_PATH = os.getenv("VIT_MODEL_PATH", None)
 detector = PlantDefectDetector(DEFECT_MODEL_PATH, VIT_MODEL_PATH)
 
@@ -207,14 +207,22 @@ def save_metadata(results: list, metadata_file: str = default_metadata_file):
 
 @app.patch("/detections/validate")
 async def validate_detection(body: dict = Body(...)):
+    """
+    This endpoint validates a detection (leaf/plant crop) or updates its plant type.
+    Works for:
+      - decision: "correct", "healthy", "other", "uncertain"
+      - decision: "plantType" (for plant type updates)
+    """
+
     print("=== Incoming validate request ===")
     print("Body:", body)
 
+    # --- Step 1: Extract Crop Path ---
     crop = body.get("crop")
     if not crop:
         raise HTTPException(status_code=400, detail="Crop not provided")
 
-    # Normalize crop path
+    # Normalize the crop path
     parsed = urlparse(crop)
     req_path = unquote(parsed.path).lstrip("/")
     if req_path.startswith("data/"):
@@ -222,17 +230,49 @@ async def validate_detection(body: dict = Body(...)):
     print("Normalized request crop:", req_path)
 
     decision = body.get("decision")
+
+    # =======================================================
+    # 🪴 Special Case: Plant Type Update
+    # =======================================================
+    if decision == "plantType" and "plant_type" in body:
+        try:
+            client.admin.command("ping")
+            print("✅ Updating plant_type.code in Mongo")
+
+            result = images.update_one(
+                {"detections.crop": req_path},
+                {"$set": {"plant_type.code": body["plant_type"]["code"]}}
+            )
+
+            if result.modified_count > 0:
+                updated_doc = images.find_one({"detections.crop": req_path}, {"_id": 0})
+                print("✅ plant_type.code updated successfully in Mongo")
+                return {"updated": updated_doc}
+            else:
+                raise HTTPException(status_code=404, detail="No document found for crop path")
+
+        except Exception as e:
+            print("⚠️ Mongo update error:", e)
+            raise HTTPException(status_code=500, detail="Mongo update failed")
+
+    # =======================================================
+    # 🌱 Regular Validation Handling
+    # =======================================================
     status_map = {
         "correct": "validated",
         "healthy": "healthy",
         "other": "validated",
         "uncertain": "uncertain"
     }
+
     update = {"status": status_map.get(decision, "unvalidated")}
+
     if decision == "other" and "type" in body:
         update["type"] = body["type"]
 
-    # Try Mongo first
+    print("Prepared update data:", update)
+
+    # --- Step 3: Try MongoDB Update ---
     try:
         client.admin.command("ping")
         print("✅ Using MongoDB for validation")
@@ -244,32 +284,36 @@ async def validate_detection(body: dict = Body(...)):
 
         if result.modified_count > 0:
             updated_doc = images.find_one({"detections.crop": req_path}, {"_id": 0})
-            print("✅ Updated detection in Mongo")
+            print("✅ Updated detection in MongoDB")
             return {"updated": updated_doc}
         else:
-            print("No match found in Mongo for:", req_path)
+            print("⚠️ No matching detection found in Mongo for:", req_path)
 
     except errors.PyMongoError as e:
         print("⚠️ MongoDB error:", e)
 
-    # JSON fallback
-    print("⚠️ Falling back to JSON patch")
+    # --- Step 4: JSON Fallback ---
+    print("⚠️ Falling back to JSON patch mode")
     metadata = load_metadata()
-    print("Loaded metadata items:", len(metadata))
 
     for item in metadata:
         for det in item.get("detections", []):
             det_crop = det.get("crop") or ""
-            print(f"Comparing request [{req_path}] with stored [{det_crop}]")
-
             if det_crop == req_path:
-                print("✅ Match found! Updating detection (JSON)...")
-                det.update(update)
+                print("✅ Match found in JSON! Updating detection...")
+
+                # Handle plantType case in JSON fallback too
+                if decision == "plantType" and "plant_type" in body:
+                    item["plant_type"]["code"] = body["plant_type"]["code"]
+                else:
+                    det.update(update)
+
                 save_metadata(metadata)
-                print("Detection updated and metadata saved to JSON")
+                print("💾 Detection updated and metadata saved to JSON")
                 return {"updated": det}
 
-    print("No match found for:", req_path)
+    # --- Step 5: If Not Found ---
+    print("❌ No match found for:", req_path)
     raise HTTPException(status_code=404, detail=f"Detection not found for {req_path}")
 
 # Delete Detection
@@ -341,7 +385,7 @@ def convert_objectid(obj):
 
 @app.post("/bulk-detect")
 async def bulk_detect(request_data: dict):
-    model_name = request_data.get("model", "HQx1280")
+    model_name = request_data.get("model", "best0501")
     os.makedirs(processed_dir, exist_ok=True)
     os.makedirs(crops_dir, exist_ok=True)
 

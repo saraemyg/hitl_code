@@ -6,7 +6,7 @@ import ConfirmModal from "../components/ConfirmModal";
 
 export interface ValidationControlsProps {
   onValidate: (
-    decision: "correct" | "healthy" | "other" | "uncertain",
+    decision: "correct" | "healthy" | "other" | "uncertain" | "plantType",
     type?: string // optional, only when decision === "other"
   ) => void;
   currentDetection: Detection; // keep: so this component knows what to display
@@ -20,23 +20,28 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
   onDelete,
 }) => {
   const [selectedClass, setSelectedClass] = useState(DEFECT_CLASSES[0]);
+  const [selectedPlantType, setSelectedPlantType] = useState("CSBL");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const getApiBase = () => { return import.meta.env.VITE_API_URL || "http://localhost:8000"; };
 
   // validate detection + auto-advance
   const validateDetection = async (
-    decision: "correct" | "healthy" | "other" | "uncertain",
-    type?: string
+    decision: "correct" | "healthy" | "other" | "uncertain" | "plantType",
+    typeOrCode?: string
   ) => {
     if (!currentDetection) return;
 
     try {
-      const body: any = {
-        crop: currentDetection.crop,
-        decision,
-        type: decision === "other" && type ? type : currentDetection.type,
-      };
+      let body: any = { crop: currentDetection.crop, decision };
+
+      if (decision === "other" && typeOrCode) {
+        body.type = typeOrCode; // for defect
+      } else if (decision === "plantType" && typeOrCode) {
+        body.plant_type = { code: typeOrCode }; // for plant validation
+      } else if (decision !== "plantType") {
+        body.type = currentDetection.type; // normal case
+      }
 
       const res = await fetch(`${getApiBase()}/detections/validate`, {
         method: "PATCH",
@@ -46,11 +51,11 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
 
       if (!res.ok) throw new Error("Failed to update detection");
       const updated = await res.json();
-      console.log("Detection updated:", updated);
+      console.log("✅ Validation updated:", updated);
 
-      onValidate(decision, body.type);
+      onValidate(decision, typeOrCode);
     } catch (err) {
-      console.error("Error updating detection:", err);
+      console.error("❌ Error updating detection:", err);
     }
   };
 
@@ -120,30 +125,69 @@ export const ValidationControls: React.FC<ValidationControlsProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-      {/* Header with info tooltip */}
+      {/* Header with info tooltip + new Validate Plant Type dropdown */}
       <div className="flex items-center justify-between relative">
-        <p className="text-gray-600 text-right">Please validate this detection.</p>
-        {/* Info button */}
-        <div className="relative group ml-2">
-          <button
-            className="w-6 h-6 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-sm font-bold"
-            type="button"
-          >
-            i
-          </button>
+        {/* Left side: Info + text */}
+        <div className="flex items-center gap-2">
+          <p className="text-gray-600 text-left">Please validate this detection.</p>
 
-          {/* Tooltip */}
-          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
-            Keyboard Shortcuts: <br />
-            A: Prev Detection <br />
-            D: Next Detection <br />
-            S: Correct <br />
-            W: Healthy <br />
-            Q: Uncertain <br />
-            Space: Next Image
+          {/* Info button */}
+          <div className="relative group">
+            <button
+              className="w-6 h-6 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-sm font-bold"
+              type="button"
+            >
+              i
+            </button>
+            {/* Tooltip — moved below to prevent clipping */}
+            <div
+              className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 opacity-0 
+                        group-hover:opacity-100 transition-opacity duration-200 bg-gray-800 text-white 
+                        text-xs rounded py-2 px-3 whitespace-pre-line z-[100] shadow-lg w-max max-w-xs"
+            >
+              <div className="text-left leading-relaxed">
+                <strong>Keyboard Shortcuts:</strong>
+                {"\n"}A: Prev Detection D: Next Detection
+                {"\n"}S: Correct W: Healthy Q: Uncertain
+                {"\n"}Space: Next Image
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Validate Plant Type with dropdown */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => validateDetection("plantType", selectedPlantType)}
+            className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-600 px-4 py-2 
+                      rounded-lg font-semibold transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            🌱 Validate Plant Type
+          </button>
+
+          {/* Dropdown for Plant Type */}
+          <select
+            value={selectedPlantType}
+            onChange={(e) => setSelectedPlantType(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gray-400 
+                      focus:border-transparent text-sm bg-white"
+          >
+            {Object.entries({
+              CSBL: "Bright Lights Swiss Chard",
+              KBSC: "Blue Scotch Kale",
+              LBSS: "Lettuce Black Seeded Simpson",
+              MBBC: "Baby Bok Choy",
+              MGMZ: "Green Mizuna",
+              RSLD: "Rocket Arugula",
+            }).map(([code, label]) => (
+              <option key={code} value={code}>
+                {code} – {label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+
 
       {/* Validation buttons */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">

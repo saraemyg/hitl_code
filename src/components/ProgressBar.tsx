@@ -4,7 +4,6 @@ import ConfirmModal from "../components/ConfirmModal";
 
 // Add available models
 const AVAILABLE_MODELS = [
-  { id: 'HQx1280', name: 'High Quality 1280px' },
   { id: 'modelv4_l_0.2', name: 'Model v4 Large' }
 ];
 
