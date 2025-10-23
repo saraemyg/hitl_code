@@ -191,19 +191,33 @@ class PlantDefectDetector:
         for result in results:
             logger.info(result)
             if result.boxes is not None:
+                h, w = result.orig_shape  # original image height, width
+
                 for box in result.boxes:
                     defect_id = int(box.cls[0])
                     defect_type = result.names[defect_id]
-                    x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                     conf = float(box.conf[0])
-                    bbox = [x1, y1, x2, y2]
 
-                    # NMS suppression: skip if overlaps ≥80% with existing same-type box
+                    # --- Normalize coordinates (YOLOv11 format: xc, yc, w, h) ---
+                    xc = ((x1 + x2) / 2) / w
+                    yc = ((y1 + y2) / 2) / h
+                    bw = (x2 - x1) / w
+                    bh = (y2 - y1) / h
+                    bbox_norm = [round(xc, 6), round(yc, 6), round(bw, 6), round(bh, 6)]
+
+                    # NMS suppression: skip if overlaps ≥0.2 with same defect type
                     skip = False
                     for d in detections:
                         if d["type"] == defect_type:
-                            iou = self._iou(bbox, d["bbox"])
-                            if iou >= 0.5:
+                            prev_bbox = d["bbox"]
+                            # convert back to xyxy for IoU calc
+                            prev_x1 = (prev_bbox[0] - prev_bbox[2] / 2) * w
+                            prev_y1 = (prev_bbox[1] - prev_bbox[3] / 2) * h
+                            prev_x2 = (prev_bbox[0] + prev_bbox[2] / 2) * w
+                            prev_y2 = (prev_bbox[1] + prev_bbox[3] / 2) * h
+                            iou = self._iou([x1, y1, x2, y2], [prev_x1, prev_y1, prev_x2, prev_y2])
+                            if iou >= 0.2:
                                 skip = True
                                 break
                     if skip:
@@ -211,7 +225,7 @@ class PlantDefectDetector:
 
                     # Call crop_handler
                     crop_path = self.crop_handler(
-                        image_bgr, x1, y1, x2, y2,
+                        image_bgr, int(x1), int(y1), int(x2), int(y2),
                         defect_id, defect_type
                     )
 
@@ -219,7 +233,7 @@ class PlantDefectDetector:
                         "id": defect_id,
                         "type": defect_type,
                         "conf": round(conf, 4),
-                        "bbox": box.xyxy[0].cpu().numpy().tolist(),
+                        "bbox": bbox_norm,
                         "status": "unvalidated",
                         "crop": crop_path
                     }

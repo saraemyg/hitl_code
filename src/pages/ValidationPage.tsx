@@ -1,5 +1,5 @@
 // src/pages/ValidationPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { SkipForward, SkipBack, Filter, Layout, ChevronLeft, ChevronRight, Check, Heart, HelpCircle,} from "lucide-react"; 
 import { useDetectionData } from "../hooks/useDetectionData";
 import { Detection } from "../types";
@@ -8,6 +8,7 @@ import { ValidationControls } from "../components/ValidationControls";
 import { ProgressBar } from "../components/ProgressBar";
 import InfoPanel from "../components/InfoPanel";
 import AnnotationPage from "./AnnotationPage";
+import { useConfidence } from "../context/ConfidenceContext"; 
 
 export const ValidationPage: React.FC = () => {
   const {
@@ -29,7 +30,10 @@ export const ValidationPage: React.FC = () => {
     windowData,
   } = useDetectionData();
 
-  const [cacheBust, setCacheBust] = useState(Date.now());
+  const { confidenceThreshold, setConfidenceThreshold } = useConfidence();
+  const mainRef = useRef<HTMLDivElement | null>(null);
+
+  // Local UI states  
   const [jumpIndex, setJumpIndex] = useState<number | "">("");
   const [showAltView, setShowAltView] = useState(false);
 
@@ -47,18 +51,38 @@ export const ValidationPage: React.FC = () => {
     crop: PLACEHOLDER_IMAGE.path,
   };
   const isUsingPlaceholder = windowData.length === 0;
-
-  useEffect(() => { setCacheBust(Date.now()); }, [windowData, currentImageIndex]);
   const currentImage = getCurrentImage();
-  const currentDetection = getCurrentDetection() || PLACEHOLDER_DETECTION; // Use hook getter
-  const detections = currentImage?.detections ?? [PLACEHOLDER_DETECTION];
+
+
+  // Filter detections by confidence threshold
+  const allDetections = currentImage?.detections ?? [];
+  const filteredDetections = allDetections.filter(
+    (det) => det.conf >= confidenceThreshold
+  );
+
+  let detections: Detection[];
+
+  if (allDetections.length === 0) {
+    // No detections at all → display placeholder
+    detections = [PLACEHOLDER_DETECTION];
+  } else if (filteredDetections.length === 0) {
+    // All detections filtered out by threshold → treat as healthy
+    detections = []; // empty to trigger healthy overlay
+  } else {
+    detections = filteredDetections;
+  }
+
+  // Keep current detection synced with filtered detections
+  const currentDetection =
+    detections.find((d) => d.id === getCurrentDetection()?.id) ||
+    detections[0] ||
+    PLACEHOLDER_DETECTION;
 
  // ===== Navigator component for detections =====
   const Navigator: React.FC = () => {
     const containerRef = React.useRef<HTMLDivElement | null>(null);
     const itemRefs = React.useRef<(HTMLDivElement | null)[]>([]);
     const scrollPosRef = React.useRef(0);
-
     const batchSize = 10;
 
     // --- preserve scroll across reloadMetadata
@@ -72,44 +96,25 @@ export const ValidationPage: React.FC = () => {
     const scrollToBatch = (index: number) => {
       const container = containerRef.current;
       if (!container) return;
-
       const batchIndex = Math.floor(index / batchSize);
       const firstItemIndex = batchIndex * batchSize;
       const firstItem = itemRefs.current[firstItemIndex];
-
       if (firstItem) {
-        container.scrollTo({
-          left: firstItem.offsetLeft,
-          behavior: "smooth",
-        });
+        container.scrollTo({ left: firstItem.offsetLeft, behavior: "smooth" });
       }
 
       // ensure current item is fully visible (in case it's clipped)
       const el = itemRefs.current[index];
       if (el) {
-        el.scrollIntoView({
-          behavior: "smooth",
-          inline: "nearest",
-          block: "nearest",
-        });
+        el.scrollIntoView({ behavior: "smooth", inline: "nearest" });
       }
     };
 
     // --- handle detection change
     React.useEffect(() => {
       const idx = detections.indexOf(currentDetection);
-      if (idx !== -1) {
-        scrollToBatch(idx);
-      }
+      if (idx !== -1) scrollToBatch(idx);
     }, [currentDetection, detections]);
-
-    // --- before reloadMetadata, save scroll
-    const handleReload = async () => {
-      if (containerRef.current) {
-        scrollPosRef.current = containerRef.current.scrollLeft;
-      }
-      await reloadMetadata();
-    };
 
     // --- keyboard shortcuts
     React.useEffect(() => {
@@ -295,7 +300,9 @@ export const ValidationPage: React.FC = () => {
         {showAltView ? (
           <AltMainContent />
         ) : (
-          <div className="parent grid grid-cols-10 grid-rows-10 gap-1 h-screen overflow-hidden">
+          <div 
+          ref={mainRef}
+          className="parent grid grid-cols-10 grid-rows-10 gap-1 h-screen overflow-hidden">
             {/* Full Image */}
             <div className="div1 col-start-1 col-end-7 row-start-1 row-end-6 bg-white rounded-lg shadow p-2 flex flex-col">
               <div className="flex items-center justify-between mb-2">
@@ -321,8 +328,10 @@ export const ValidationPage: React.FC = () => {
 
               <div className="flex-1 overflow-hidden">
                 <ImageViewer
-                  imageSrc={currentImage?.processed_img || PLACEHOLDER_IMAGE.path}
-                  zoomable={true} // enable zoom + slider + keyboard control
+                  imageSrc={currentImage?.uploaded_img || PLACEHOLDER_IMAGE.path}
+                  currentDetection={currentDetection || null} // pass the selected detection
+                  detections={currentImage?.detections || []}
+                  zoomable={true}
                 />
               </div>
             </div>
@@ -367,14 +376,49 @@ export const ValidationPage: React.FC = () => {
               )}
             </div>
 
-            {/* Info Panel */}
-            <div className="div3 col-start-9 col-end-11 row-start-1 row-end-9 bg-white rounded-lg shadow relative overflow-y-auto">
-              {currentImage?.detections?.length === 0 && (
-                <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg z-30 animate-fadeIn">
+            {/* Info Panel + Confidence Slider */}
+            <div className="div3 col-start-9 col-end-11 row-start-1 row-end-9 bg-white rounded-lg shadow relative flex flex-col">
+              {/* Confidence Slider Section */}
+              <div className="p-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-700 font-medium">
+                    Confidence:
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={confidenceThreshold}
+                    onChange={(e) =>
+                      setConfidenceThreshold(parseFloat(e.target.value))
+                    }
+                    className="w-24"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={confidenceThreshold}
+                    onChange={(e) =>
+                      setConfidenceThreshold(parseFloat(e.target.value))
+                    }
+                    className="border border-gray-300 rounded-md px-2 py-1 w-14 text-sm text-center"
+                  />
                 </div>
-              )}
+                <span className="text-xs text-gray-500">
+                  ≥ {confidenceThreshold.toFixed(2)}
+                </span>
+              </div>
 
-              <InfoPanel currentImage={currentImage} currentDetection={currentDetection} />
+              {/* Info Panel */}
+              <div className="flex-1 overflow-y-auto overflow-x-hidden">
+                <InfoPanel
+                  currentImage={currentImage}
+                  currentDetection={currentDetection}
+                />
+              </div>
             </div>
 
             {/* Navigator */}

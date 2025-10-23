@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { ValidationPage } from "./pages/ValidationPage";
 import SummaryPage from "./pages/SummaryPage";
 import { MetadataProvider, useMetadata } from "./context/MetadataContext";
+import { ConfidenceProvider } from "./context/ConfidenceContext"; // still imported — provider only
 import { BarChart2, CheckCircle, Menu, X } from "lucide-react";
 
 function Navigation() {
   const location = useLocation();
   const { metadataFiles, selectedMetadata, setSelectedMetadata } = useMetadata();
-  const [isOpen, setIsOpen] = useState(false); // toggle menu
+  const [isOpen, setIsOpen] = React.useState(false); // toggle menu
 
   return (
     <nav className="bg-white border-b border-gray-200 p-3 flex items-center justify-between shadow-sm relative">
@@ -102,7 +103,9 @@ function AppContent() {
 export default function App() {
   return (
     <MetadataProvider>
-      <AppContent />
+      <ConfidenceProvider>
+        <AppContent />
+      </ConfidenceProvider>
     </MetadataProvider>
   );
 }

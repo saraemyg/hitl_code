@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { ImageData } from "../types";
 import { useMetadata } from "../context/MetadataContext";
 
@@ -13,11 +13,11 @@ const getApiBase = () => {
 // Fetch metadata from backend
 // ----------------------------------------------------------------
 export const fetchDetectionMetadata = async (
-  selectedMetadata?: string // optional, fallback to default inside
+  selectedMetadata?: string
 ): Promise<ImageData[]> => {
   const API_BASE = getApiBase();
 
-  // --- Plant label lookup 
+  // --- Plant label lookup
   const PLANT_LABELS: Record<string, string> = {
     CSBL: "Bright Lights Swiss Chard",
     KBSC: "Blue Scotch Kale",
@@ -51,19 +51,13 @@ export const fetchDetectionMetadata = async (
     const plantType = item.plant_type || {};
     const code = plantType.code || null;
     const conf = plantType.conf || null;
-
-    // If code exists, show readable label
     const readableLabel = code && PLANT_LABELS[code] ? PLANT_LABELS[code] : code;
 
     return {
       uploaded_img: `${API_BASE}/${item.uploaded_img}`,
       processed_img: `${API_BASE}/${item.processed_img}`,
       defect_count: item.defect_count,
-      plant_type: {
-        code,                    // stored code (MBBC, etc.)
-        label: readableLabel,    // UI label (Baby Bok Choy)
-        conf,                    // confidence from ViT
-      },
+      plant_type: { code, label: readableLabel, conf },
       detections: item.detections.map((det: any) => ({
         id: det.id,
         type: det.type,
@@ -81,46 +75,60 @@ export const fetchDetectionMetadata = async (
 // Filter type
 export type FilterStatus = "all" | "validated" | "unvalidated" | "uncertain" | "healthy";
 
-// Hook -------------------------------------------------------
-
+// Hook start
 export const useDetectionData = () => {
-  const { selectedMetadata } = useMetadata(); 
+  const { selectedMetadata } = useMetadata();
 
-  // Store raw metadata outside state to avoid unnecessary re-renders
+  // Store raw metadata outside state (avoids re-renders)
   const metadataRef = useRef<ImageData[]>([]);
 
   // Navigation state
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [currentDetectionIndex, setCurrentDetectionIndex] = useState(0);
 
-  // Small "window" of data in state for performance UI efficiency
+  // Performance: small data window for previews
   const [windowData, setWindowData] = useState<ImageData[]>([]);
 
   // Track validation results
   const [validationResults, setValidationResults] = useState<any[]>([]);
 
-  // Filter control (used only for UI)
+  // Filter controls
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
 
+  // Confidence threshold for filtering detections
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.05);
+
+  // General state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [data, setData] = useState<ImageData[]>([]); // store loaded metadata
+  const [data, setData] = useState<ImageData[]>([]);
 
-  // Helpers -----------------------------------------------------
+  // Filter helper — applies filterStatus + confidence threshold
+  const getFilteredMetadata = useMemo(() => {
+    return metadataRef.current
+      .map((img) => {
+        // Filter detections per image based on confidence
+        const filteredDetections = img.detections.filter((det) => det.conf >= confidenceThreshold);
 
-  // Filter helper get filtered metadata for UI (thumbnails, progress)
-  const getFilteredMetadata = () => {
-    return metadataRef.current.filter((img) => {
-      if (filterStatus === "all") return true;
-      return img.detections.some((det) => {
-        if (filterStatus === "validated") return det.status === "validated";
-        if (filterStatus === "unvalidated") return det.status === "unvalidated";
-        return true;
-      });
-    });
-  };
+        // Skip images that have no valid detections
+        if (filteredDetections.length === 0) return null;
 
-  // --- Sliding window for performance
+        // Apply optional status filtering (validated/unvalidated)
+        const passesStatusFilter =
+          filterStatus === "all"
+            ? true
+            : filteredDetections.some((det) => {
+                if (filterStatus === "validated") return det.status === "validated";
+                if (filterStatus === "unvalidated") return det.status === "unvalidated";
+                return true;
+              });
+
+        return passesStatusFilter ? { ...img, detections: filteredDetections } : null;
+      })
+      .filter((img): img is ImageData => img !== null);
+  }, [filterStatus, confidenceThreshold, metadataRef.current]); // dependency on threshold + status
+
+  // Sliding window for performance
   const updateWindow = (imgIndex: number) => {
     const windowSize = 5;
     const start = Math.max(0, imgIndex - 2);
@@ -128,22 +136,22 @@ export const useDetectionData = () => {
     setWindowData(metadataRef.current.slice(start, end));
   };
 
-  // Accessors using full metadata (prevents jumping on validation)
+  // Data accessors
+  // ----------------------------------------------------------------
+  const getCurrentImage = () => getFilteredMetadata[currentImageIndex];
   const getCurrentDetection = () => getCurrentImage()?.detections[currentDetectionIndex];
   const getCurrentCropPath = () => getCurrentDetection()?.crop ?? null;
-  const getCurrentImage = () => {
-    const filteredData = getFilteredMetadata();
-    return filteredData[currentImageIndex];
-  };
 
-  // Metadata ------------------------------------------------
+  // ----------------------------------------------------------------
+  // Metadata reloading
+  // ----------------------------------------------------------------
   const reloadMetadata = async () => {
     setLoading(true);
     setError(null);
     try {
       const newMetadata = await fetchDetectionMetadata(selectedMetadata);
       metadataRef.current = newMetadata;
-      setData(newMetadata); // keep copy for read-only access
+      setData(newMetadata);
       updateWindow(currentImageIndex);
     } catch (err: any) {
       console.error("Failed to reload metadata:", err);
@@ -153,20 +161,18 @@ export const useDetectionData = () => {
     }
   };
 
-  // Auto reload on metadata change
   useEffect(() => {
     if (selectedMetadata) reloadMetadata();
   }, [selectedMetadata]);
 
-  // Navigation -----------------------------------------
-  
-  // Detection Navigation
+  // ----------------------------------------------------------------
+  // Navigation functions
+  // ----------------------------------------------------------------
   const goNextDetection = () => {
     const img = getCurrentImage();
     if (!img) return;
-    if (currentDetectionIndex < img.detections.length - 1) {
+    if (currentDetectionIndex < img.detections.length - 1)
       setCurrentDetectionIndex((i) => i + 1);
-    }
   };
 
   const goPrevDetection = () => {
@@ -179,9 +185,8 @@ export const useDetectionData = () => {
     if (index >= 0 && index < img.detections.length) setCurrentDetectionIndex(index);
   };
 
-  // Image navigation
   const goNextImage = () => {
-    const nextIdx = Math.min(currentImageIndex + 1, metadataRef.current.length - 1);
+    const nextIdx = Math.min(currentImageIndex + 1, getFilteredMetadata.length - 1);
     setCurrentImageIndex(nextIdx);
     setCurrentDetectionIndex(0);
     updateWindow(nextIdx);
@@ -195,22 +200,22 @@ export const useDetectionData = () => {
   };
 
   const goToImage = (index: number) => {
-    if (index >= 0 && index < metadataRef.current.length) {
+    if (index >= 0 && index < getFilteredMetadata.length) {
       setCurrentImageIndex(index);
       setCurrentDetectionIndex(0);
       updateWindow(index);
     }
   };
 
-  // Validation ----------------------------------------------
- 
+  // ----------------------------------------------------------------
+  // Validation logic
+  // ----------------------------------------------------------------
   const validateDetection = (
     decision: "correct" | "healthy" | "other" | "uncertain" | "plantType",
     className?: string
   ) => {
     const detection = getCurrentDetection();
     if (!detection) return;
-
     detection.validated = true;
     detection.validatedAs = decision === "other" ? className : decision;
 
@@ -220,13 +225,17 @@ export const useDetectionData = () => {
     ]);
   };
 
-  // Progress --------------------------------------------
-
+  // ----------------------------------------------------------------
+  // Progress tracking
+  // ----------------------------------------------------------------
   const getTotalDetections = () =>
     metadataRef.current.reduce((total, img) => total + img.detections.length, 0);
 
   const getValidatedCount = () =>
-    metadataRef.current.reduce((total, img) => total + img.detections.filter((d) => d.validated).length, 0);
+    metadataRef.current.reduce(
+      (total, img) => total + img.detections.filter((d) => d.validated).length,
+      0
+    );
 
   const getProgress = () => {
     const total = getTotalDetections();
@@ -234,17 +243,22 @@ export const useDetectionData = () => {
     return total > 0 ? (validated / total) * 100 : 0;
   };
 
-  const getImageCount = () => metadataRef.current.length;
+  const getImageCount = () => getFilteredMetadata.length;
 
+  // ----------------------------------------------------------------
+  // Return public API
+  // ----------------------------------------------------------------
   return {
-
     data,
     loading,
     error,
-    
+
     windowData,
     currentImageIndex,
     currentDetectionIndex,
+
+    confidenceThreshold,      
+    setConfidenceThreshold,    
 
     getCurrentImage,
     getCurrentDetection,
