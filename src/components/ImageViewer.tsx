@@ -200,8 +200,8 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
     ctx.scale(scale, scale);
     ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
-    // --- always show all boxes
-    detections.forEach((det) => {
+    // --- helper function to draw each detection
+    function drawDetection(det: any, isCurrent: boolean) {
       const [x, y, w, h] = det.bbox as [number, number, number, number];
       const absX = x * renderWidth + offsetX;
       const absY = y * renderHeight + offsetY;
@@ -210,11 +210,8 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
       const x1 = absX - boxW / 2;
       const y1 = absY - boxH / 2;
 
-      // --- Dynamic color by detection id (cyclic lookup)
       const colorIndex = det.id % COLORS.length;
       const baseColor = COLORS[colorIndex];
-
-      const isCurrent = det === currentDetection;
 
       // --- stroke settings (box outline)
       ctx.strokeStyle = isCurrent ? "#ffffff" : baseColor;
@@ -232,14 +229,26 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
         const textHeight = fontSize + 4 / scale;
 
         // Label background box 
-        ctx.fillStyle = isCurrent ? "#000000ff" : baseColor;
+        ctx.fillStyle = isCurrent ? "#ffffffff" : baseColor;
         ctx.fillRect(x1, y1 - textHeight, textWidth + padding * 2, textHeight);
 
         // --- Label text color
-        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
         ctx.fillText(label, x1 + padding, y1 - 4 / scale);
       }
+    }
+
+    // --- draw all other detections first
+    detections.forEach((det) => {
+      if (det !== currentDetection) {
+        drawDetection(det, false);
+      }
     });
+
+    // --- draw current detection last (on top)
+    if (currentDetection) {
+      drawDetection(currentDetection, true);
+    }
 
     ctx.restore();
   }, [
@@ -252,6 +261,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
     showAllDetections,
     currentDetection,
   ]);
+
 
   return (
     <div
